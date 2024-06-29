@@ -22,6 +22,11 @@ ACCOUNTS_PJ=(
   '{"cnpj": "66666666000100", "nome": "Empresa 6", "senha": "senha6", "numconta": 0, "tipo": 2, "balanco": 6000.0}'
 )
 
+ACCOUNTS_CJ=(
+  '{"cpf1": "11111111111", "cpf2": "22222222222", "nome": "Conta Conjunta 1", "senha": "senha1", "numconta": 0, "tipo": 3, "balanco": 0.0}'
+  '{"cpf1": "33333333333", "cpf2": "44444444444", "nome": "Conta Conjunta 2", "senha": "senha2", "numconta": 0, "tipo": 3, "balanco": 0.0}'
+)
+
 # Função para criar contas PF
 create_accounts_pf() {
   for account in "${ACCOUNTS_PF[@]}"; do
@@ -36,11 +41,18 @@ create_accounts_pj() {
   done
 }
 
+# Função para criar contas CJ
+create_accounts_cj() {
+  for account in "${ACCOUNTS_CJ[@]}"; do
+    curl -s -X POST "$BASE_URL/criarContaCJ" -H "Content-Type: application/json" -d "$account" &
+  done
+}
+
 # Executa as funções de criação de contas em paralelo
-create_accounts_pf
-create_accounts_pj
+create_accounts_pf & create_accounts_pj & create_accounts_cj
 
 # Espera todos os processos terminarem
 wait
 
-echo "Testes de criação de contas PF e PJ finalizados."
+echo "Testes de criação de contas PF, PJ e CJ finalizados."
+read -p "Pressione Enter para fechar..."

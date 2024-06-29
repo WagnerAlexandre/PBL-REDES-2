@@ -48,9 +48,9 @@ type Login struct {
 }
 
 type CadastroPFPJ struct {
-	CNPJ  string `json:"cnpj"`
-	Nome  string `json:"nome"`
-	Senha string `json:"senha"`
+	CPFCNPJ string `json:"cpfcnpj"`
+	Nome    string `json:"nome"`
+	Senha   string `json:"senha"`
 }
 
 type CadastroCJ struct {
@@ -82,54 +82,78 @@ var IndexcontasPF = make(map[string][]*ContaPF)
 var IndexcontasPJ = make(map[string][]*ContaPJ)
 var IndexcontasCJ = make(map[string][]*ContaCJ)
 
-func criar_conta_pf(c *gin.Context) {
+func rota_Cadastrar_PF(c *gin.Context) {
 	var conta ContaPF
+	if err := c.BindJSON(&conta); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	criar_conta_pf(&conta)
+	c.JSON(http.StatusCreated, gin.H{"message": "Conta criada com sucesso", "conta": conta})
+}
 
+func criar_conta_pf(conta *ContaPF) {
 	conta.NumConta = criar_NumConta()
+	conta.Balanco = 0.0
 
 	// Armazena as informações da conta em TContasPF
-	TContasPF[conta.NumConta] = &conta
+	TContasPF[conta.NumConta] = conta
 
-	var ponteiro *ContaPF = TContasPF[conta.NumConta]
-
-	// indexa a conta usando o cpf
-	IndexcontasPF[conta.CPF] = append(IndexcontasPF[conta.CPF], ponteiro)
-	c.JSON(http.StatusCreated, conta)
+	// Indexa a conta usando o CPF
+	IndexcontasPF[conta.CPF] = append(IndexcontasPF[conta.CPF], conta)
 }
 
-func routa_Cadastrar_PF(c *gin.Context) {
-	if err := c.BindJSON(&conta); err != nil {
+func rota_Cadastrar_PJ(c *gin.Context) {
+	var cadastro CadastroPFPJ
+	if err := c.BindJSON(&cadastro); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	var novaConta *ContaPJ
+	novaConta = criar_conta_pj(&cadastro)
+	c.JSON(http.StatusCreated, novaConta)
 }
 
-func criar_conta_pj(c *gin.Context) {
+func criar_conta_pj(novaConta *CadastroPFPJ) *ContaPJ {
 	var conta ContaPJ
-	if err := c.BindJSON(&conta); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	conta.Nome = novaConta.Nome
+	conta.CNPJ = novaConta.CPFCNPJ
+	conta.Senha = novaConta.Senha
+
 	conta.NumConta = criar_NumConta()
+	conta.Balanco = 0.0
+
+	// Armazena as informações da conta em TContasPJ
+	TContasPJ[conta.NumConta] = &conta
+
+	// Indexa a conta usando o CPF
 	IndexcontasPJ[conta.CNPJ] = append(IndexcontasPJ[conta.CNPJ], &conta)
-	c.JSON(http.StatusCreated, conta)
+	return &conta
 }
 
-func criar_conta_cj(c *gin.Context) {
+func rota_Cadastrar_CJ(c *gin.Context) {
 	var conta ContaCJ
 	if err := c.BindJSON(&conta); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	conta.NumConta = criar_NumConta()
-	IndexcontasCJ[conta.CPF1] = append(IndexcontasCJ[conta.CPF1], &conta)
-	IndexcontasCJ[conta.CPF2] = append(IndexcontasCJ[conta.CPF2], &conta)
-	c.JSON(http.StatusCreated, conta)
+	criar_conta_cj(&conta)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Conta conjunta criada com sucesso", "conta": conta})
 }
 
-//func criarContasIniciais() int {
-//	return 1
-//}
+func criar_conta_cj(conta *ContaCJ) {
+	conta.NumConta = criar_NumConta()
+	conta.Balanco = 0.0
+
+	// Armazena as informações da conta em TContasCJ
+	TContasCJ[conta.NumConta] = conta
+
+	// Indexa a conta usando os CPFs
+	IndexcontasCJ[conta.CPF1] = append(IndexcontasCJ[conta.CPF1], conta)
+	IndexcontasCJ[conta.CPF2] = append(IndexcontasCJ[conta.CPF2], conta)
+}
 
 func main() {
 	router := gin.Default()
@@ -144,9 +168,9 @@ func main() {
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
 	router.POST("/login", loginHandler)
-	router.POST("/criarContaPF", criar_conta_pf)
-	router.POST("/criarContaPJ", criar_conta_pj)
-	router.POST("/criarContaCJ", criar_conta_cj)
+	router.POST("/criarContaPF", rota_Cadastrar_PF)
+	router.POST("/criarContaPJ", rota_Cadastrar_PJ)
+	router.POST("/criarContaCJ", rota_Cadastrar_CJ)
 
 	router.Run("localhost:8080")
 }

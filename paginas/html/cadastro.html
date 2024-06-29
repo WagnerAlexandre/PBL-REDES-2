@@ -54,6 +54,12 @@
             margin-top: 20px;
             font-weight: bold;
         }
+        .link-acessar-conta {
+            margin-top: 14px;
+            text-decoration: none;
+            color: #007bff;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -105,6 +111,7 @@
         </div>
 
         <button type="submit">Cadastrar</button>
+        <a class="link-acessar-conta" href="login.html">Já possui uma conta? Crie aqui.</a>
     </form>
     <div id="result"></div>
 </div>
@@ -134,7 +141,6 @@ document.getElementById('registerForm').addEventListener('submit', function(even
 
     var tipoConta = document.getElementById('tipoConta').value;
     var formData = {
-        numconta: Math.floor(Math.random() * 1000000),
         tipo: parseInt(tipoConta, 10),
         senha: '',
         balanco: 0
@@ -143,21 +149,21 @@ document.getElementById('registerForm').addEventListener('submit', function(even
     var url = '';
 
     if (tipoConta === '1') {
-        formData.cpf = document.getElementById('cpf').value;
+        formData.cpfcnpj = document.getElementById('cpf').value;
         formData.nome = document.getElementById('nome').value;
         formData.senha = document.getElementById('senha').value;
-        url = 'http://localhost:8080/cadastrarPF';
+        url = 'http://localhost:8080/criarContaPF';
     } else if (tipoConta === '2') {
-        formData.cnpj = document.getElementById('cnpj').value;
+        formData.cpfcnpj = document.getElementById('cnpj').value;
         formData.nome = document.getElementById('nomePJ').value;
         formData.senha = document.getElementById('senhaPJ').value;
-        url = 'http://localhost:8080/cadastrarPJ';
+        url = 'http://localhost:8080/criarContaPJ';
     } else if (tipoConta === '3') {
         formData.cpf1 = document.getElementById('cpf1').value;
         formData.cpf2 = document.getElementById('cpf2').value;
         formData.nome = document.getElementById('nomeCJ').value;
         formData.senha = document.getElementById('senhaCJ').value;
-        url = 'http://localhost:8080/cadastrarCJ';
+        url = 'http://localhost:8080/criarContaCJ';
     }
 
     fetch(url, {
@@ -174,6 +180,10 @@ document.getElementById('registerForm').addEventListener('submit', function(even
     }).then(data => {
         console.log('Success:', data);
         document.getElementById('result').textContent = 'Conta criada com sucesso: ' + JSON.stringify(data["message"]);
+
+        setTimeout(() => {
+            window.location.href = 'menuprincipal.html';
+        }, 2000); // Redireciona após 2 segundos
     }).catch(error => {
         console.error('Error:', error);
         document.getElementById('result').textContent = 'Erro ao criar conta: ' + error.message;
