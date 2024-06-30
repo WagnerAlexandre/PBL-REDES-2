@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -8,7 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Estrutura para conta bancaria pessoa fisica
+const (
+	BBMN  = "65500"
+	BB    = "65501"
+	BG    = "65502"
+	ATUAL = BB
+)
+
 type ContaPF struct {
 	NumConta int     `json:"numconta"`
 	CPF      string  `json:"cpf"`
@@ -18,7 +25,6 @@ type ContaPF struct {
 	Balanco  float64 `json:"balanco"`
 }
 
-// Estrutura para conta bancaria pessoa juridica
 type ContaPJ struct {
 	NumConta int     `json:"numconta"`
 	CNPJ     string  `json:"cnpj"`
@@ -28,7 +34,6 @@ type ContaPJ struct {
 	Balanco  float64 `json:"balanco"`
 }
 
-// Estrutura para conta bancaria conjunta
 type ContaCJ struct {
 	NumConta int     `json:"numconta"`
 	CPF1     string  `json:"cpf1"`
@@ -39,7 +44,6 @@ type ContaCJ struct {
 	Balanco  float64 `json:"balanco"`
 }
 
-// Estrutura representando o login
 type Login struct {
 	CPFRAZAO string `json:"CPFRAZAO"`
 	NumConta int    `json:"numconta"`
@@ -59,26 +63,155 @@ type CadastroCJ struct {
 	Senha string `json:"senha"`
 }
 
-// mutex para numero de conta
-var mutexCriacao = &sync.Mutex{}
-var numero_contas int = 1
+var (
+	mutexCriacao  = &sync.Mutex{}
+	numero_contas = 1
+)
 
-// Função para criar um número de conta único de forma segura
+var (
+	TContasPF     = make(map[int]*ContaPF)
+	TContasPJ     = make(map[int]*ContaPJ)
+	TContasCJ     = make(map[int]*ContaCJ)
+	IndexcontasPF = make(map[string][]*ContaPF)
+	IndexcontasPJ = make(map[string][]*ContaPJ)
+	IndexcontasCJ = make(map[string][]*ContaCJ)
+)
+
+func main() {
+	router := gin.Default()
+
+	// Configuração básica do CORS para permitir todas as origens
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"*"}
+	config.AllowMethods = []string{"GET", "POST", "OPTIONS"} // Incluir OPTIONS para tratamento de CORS
+	router.Use(cors.New(config))
+
+	// Servir arquivos estáticos
+	router.Static("/static", "./static")
+
+	// Rotas para páginas HTML
+	router.GET("/inicial", func(c *gin.Context) {
+		c.File("./static/login.html")
+	})
+
+	router.GET("/cadastro", func(c *gin.Context) {
+		c.File("./static/cadastro.html")
+	})
+
+	router.GET("/menuprincipal", func(c *gin.Context) {
+		c.File("./static/menuprincipal.html")
+	})
+
+	// Rotas da API
+	router.POST("/login", loginHandler)
+	router.POST("/criarContaPF", rota_Cadastrar_PF)
+	router.POST("/criarContaPJ", rota_Cadastrar_PJ)
+	router.POST("/criarContaCJ", rota_Cadastrar_CJ)
+	router.GET("/contasPF", getContasPF)
+	router.GET("/contasPJ", getContasPJ)
+	router.GET("/contasCJ", getContasCJ)
+
+	// Execução do servidor
+	serverPort := ":65501"
+	fmt.Printf("Servidor rodando em http://localhost%s\n", serverPort)
+	if err := router.Run(serverPort); err != nil {
+		panic(err)
+	}
+}
+
+// Funções de manipulação de dados
+
 func criar_NumConta() int {
-	mutexCriacao.Lock()         // Bloqueia o mutex antes de modificar numero_contas
-	defer mutexCriacao.Unlock() // Garante que o mutex seja desbloqueado após o término da função
+	mutexCriacao.Lock()
+	defer mutexCriacao.Unlock()
 	temp := numero_contas
 	numero_contas++
 	return temp
 }
 
-var TContasPF = make(map[int]*ContaPF)
-var TContasPJ = make(map[int]*ContaPJ)
-var TContasCJ = make(map[int]*ContaCJ)
+func criar_conta_pf(conta *ContaPF) {
+	conta.NumConta = criar_NumConta()
+	conta.Balanco = 0.0
+	TContasPF[conta.NumConta] = conta
+	IndexcontasPF[conta.CPF] = append(IndexcontasPF[conta.CPF], conta)
+}
 
-var IndexcontasPF = make(map[string][]*ContaPF)
-var IndexcontasPJ = make(map[string][]*ContaPJ)
-var IndexcontasCJ = make(map[string][]*ContaCJ)
+func criar_conta_pj(cadastro *CadastroPFPJ) *ContaPJ {
+	conta := &ContaPJ{
+		NumConta: criar_NumConta(),
+		CNPJ:     cadastro.CPFCNPJ,
+		Nome:     cadastro.Nome,
+		Senha:    cadastro.Senha,
+		Tipo:     2,
+		Balanco:  0.0,
+	}
+	TContasPJ[conta.NumConta] = conta
+	IndexcontasPJ[conta.CNPJ] = append(IndexcontasPJ[conta.CNPJ], conta)
+	return conta
+}
+
+func criar_conta_cj(cadastro *CadastroCJ) *ContaCJ {
+	conta := &ContaCJ{
+		NumConta: criar_NumConta(),
+		CPF1:     cadastro.CPF1,
+		CPF2:     cadastro.CPF2,
+		Nome:     cadastro.CPF1 + " e " + cadastro.CPF2,
+		Senha:    cadastro.Senha,
+		Tipo:     3,
+		Balanco:  0.0,
+	}
+	TContasCJ[conta.NumConta] = conta
+	IndexcontasCJ[conta.CPF1] = append(IndexcontasCJ[conta.CPF1], conta)
+	IndexcontasCJ[conta.CPF2] = append(IndexcontasCJ[conta.CPF2], conta)
+	return conta
+}
+
+func loginHandler(c *gin.Context) {
+	var req Login
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	var conta interface{}
+	var nome, cpfRazao string
+	var balanco float64
+
+	switch req.Tipo {
+	case 1:
+		if c, exists := TContasPF[req.NumConta]; exists && c.Senha == req.Senha {
+			conta = c
+			nome = c.Nome
+			cpfRazao = c.CPF
+			balanco = c.Balanco
+		}
+	case 2:
+		if c, exists := TContasPJ[req.NumConta]; exists && c.Senha == req.Senha && c.CNPJ == req.CPFRAZAO {
+			conta = c
+			nome = c.Nome
+			cpfRazao = c.CNPJ
+			balanco = c.Balanco
+		}
+	case 3:
+		if c, exists := TContasCJ[req.NumConta]; exists && c.Senha == req.Senha {
+			conta = c
+			nome = c.Nome
+			cpfRazao = c.CPF1 + " e " + c.CPF2
+			balanco = c.Balanco
+		}
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tipo de conta inválido"})
+		return
+	}
+
+	if conta != nil {
+		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f", nome, cpfRazao, req.NumConta, balanco)
+		c.SetCookie("brasilheirinho", cookieValue, 3600, "/banco-brasileirinho", "localhost", false, false)
+		c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciais inválidas"})
+	}
+}
 
 func rota_Cadastrar_PF(c *gin.Context) {
 	var cadastro CadastroPFPJ
@@ -102,17 +235,6 @@ func rota_Cadastrar_PF(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Conta criada com sucesso", "conta": conta})
 }
 
-func criar_conta_pf(conta *ContaPF) {
-	conta.NumConta = criar_NumConta()
-	conta.Balanco = 0.0
-
-	// Armazena as informações da conta em TContasPF
-	TContasPF[conta.NumConta] = conta
-
-	// Indexa a conta usando o CPF
-	IndexcontasPF[conta.CPF] = append(IndexcontasPF[conta.CPF], conta)
-}
-
 func rota_Cadastrar_PJ(c *gin.Context) {
 	var cadastro CadastroPFPJ
 	if err := c.BindJSON(&cadastro); err != nil {
@@ -129,46 +251,6 @@ func rota_Cadastrar_PJ(c *gin.Context) {
 	c.JSON(http.StatusCreated, novaConta)
 }
 
-func criar_conta_pj(cadastro *CadastroPFPJ) *ContaPJ {
-	conta := &ContaPJ{
-		NumConta: criar_NumConta(),
-		CNPJ:     cadastro.CPFCNPJ,
-		Nome:     cadastro.Nome,
-		Senha:    cadastro.Senha,
-		Tipo:     2, // Tipo para Pessoa Jurídica
-		Balanco:  0.0,
-	}
-
-	// Armazena as informações da conta em TContasPJ
-	TContasPJ[conta.NumConta] = conta
-
-	// Indexa a conta usando o CNPJ
-	IndexcontasPJ[conta.CNPJ] = append(IndexcontasPJ[conta.CNPJ], conta)
-
-	return conta
-}
-
-func criar_conta_cj(cadastro *CadastroCJ) *ContaCJ {
-	conta := &ContaCJ{
-		NumConta: criar_NumConta(),
-		CPF1:     cadastro.CPF1,
-		CPF2:     cadastro.CPF2,
-		Nome:     cadastro.CPF1 + " e " + cadastro.CPF2, // Opcional
-		Senha:    cadastro.Senha,
-		Tipo:     3, // Tipo para Conta Conjunta
-		Balanco:  0.0,
-	}
-
-	// Armazena as informações da conta em TContasCJ
-	TContasCJ[conta.NumConta] = conta
-
-	// Indexa a conta usando os CPFs
-	IndexcontasCJ[conta.CPF1] = append(IndexcontasCJ[conta.CPF1], conta)
-	IndexcontasCJ[conta.CPF2] = append(IndexcontasCJ[conta.CPF2], conta)
-
-	return conta
-}
-
 func rota_Cadastrar_CJ(c *gin.Context) {
 	var cadastro CadastroCJ
 	if err := c.BindJSON(&cadastro); err != nil {
@@ -180,83 +262,20 @@ func rota_Cadastrar_CJ(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Conta conjunta criada com sucesso", "conta": novaConta})
 }
 
-func checaExistencia(chave string) bool {
-	// Verifica se a chave existe em IndexcontasPF
-	_, existsPF := IndexcontasPF[chave]
-	// Verifica se a chave existe em IndexcontasPJ
-	_, existsPJ := IndexcontasPJ[chave]
-
-	// Retorna true se a chave existe em IndexcontasPF ou IndexcontasPJ
-	return existsPF || existsPJ
-}
-
-func main() {
-	router := gin.Default()
-	// Configuração básica do CORS para permitir todas as origens
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"*"}
-	config.AllowMethods = []string{"GET", "POST", "OPTIONS"} // Incluir OPTIONS para tratamento de CORS
-
-	router.Use(cors.New(config))
-	// ROTAS
-	router.GET("/contasPF", getContasPF)
-	router.GET("/contasPJ", getContasPJ)
-	router.GET("/contasCJ", getContasCJ)
-	router.POST("/login", loginHandler)
-	router.POST("/criarContaPF", rota_Cadastrar_PF)
-	router.POST("/criarContaPJ", rota_Cadastrar_PJ)
-	router.POST("/criarContaCJ", rota_Cadastrar_CJ)
-
-	router.Run("localhost:8080")
-}
-
-func loginHandler(c *gin.Context) {
-	var req Login
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
-		return
-	}
-
-	// Verifica o tipo de conta e seleciona o mapa apropriado
-
-	switch req.Tipo {
-	case 1:
-		if conta, exists := TContasPF[req.NumConta]; exists {
-			if conta.Senha == req.Senha {
-				c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
-				return
-			}
-		}
-	case 2:
-		if conta, exists := TContasPJ[req.NumConta]; exists {
-			if conta.Senha == req.Senha && conta.CNPJ == req.CPFRAZAO {
-				c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
-				return
-			}
-		}
-	case 3:
-		if conta, exists := TContasCJ[req.NumConta]; exists {
-			if conta.Senha == req.Senha {
-				c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
-				return
-			}
-		}
-	default:
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tipo de conta inválido"})
-		return
-	}
-
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciais inválidas"})
-}
-
 func getContasPF(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, IndexcontasPF)
+	c.JSON(http.StatusOK, gin.H{"contasPF": TContasPF})
 }
 
 func getContasPJ(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, IndexcontasPJ)
+	c.JSON(http.StatusOK, gin.H{"contasPJ": TContasPJ})
 }
 
 func getContasCJ(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, IndexcontasCJ)
+	c.JSON(http.StatusOK, gin.H{"contasCJ": TContasCJ})
+}
+
+func checaExistencia(cpfcnpj string) bool {
+	_, existsPF := IndexcontasPF[cpfcnpj]
+	_, existsPJ := IndexcontasPJ[cpfcnpj]
+	return existsPF || existsPJ
 }
