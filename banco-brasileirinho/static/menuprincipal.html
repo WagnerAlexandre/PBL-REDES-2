@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <title>Banco Brasileirinho - Interface</title>
@@ -14,6 +15,7 @@
             height: 100vh;
             margin: 0;
         }
+
         .bank-container {
             background-color: #ffffff;
             border: 2px solid #4caf50;
@@ -23,22 +25,51 @@
             text-align: center;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
         .bank-container h1 {
             color: #ffeb3b;
         }
+
         .bank-container p {
             margin: 10px 0;
         }
-        .logout-button {
-            background-color: #f44336;
-            color: white;
+
+        .bank-container .actions {
+            margin-top: 20px;
+        }
+
+        .bank-container .actions div {
+            margin-bottom: 10px;
+        }
+
+        .bank-container input {
+            padding: 5px;
+            margin: 5px 0;
+        }
+
+        .bank-container button {
             padding: 10px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            color: white;
+        }
+
+        .deposit-button {
+            background-color: #4caf50;
+        }
+
+        .withdraw-button {
+            background-color: #f44336;
+        }
+
+        .logout-button {
+            background-color: #0d47a1;
+            margin-top: 10px;
         }
     </style>
 </head>
+
 <body>
     <div class="bank-container">
         <h1>Banco Brasileirinho</h1>
@@ -46,36 +77,115 @@
         <p>CPF/CNPJ: <span id="accountCPF"></span></p>
         <p>Número da Conta: <span id="accountNumber"></span></p>
         <p>Balanço: <span id="accountBalance"></span></p>
+        <div class="actions">
+            <div>
+                <input type="number" id="depositAmount" placeholder="Valor para depositar">
+                <button class="deposit-button" onclick="deposit()">Depositar</button>
+            </div>
+            <div>
+                <input type="number" id="withdrawAmount" placeholder="Valor para retirar">
+                <button class="withdraw-button" onclick="withdraw()">Retirar</button>
+            </div>
+        </div>
         <button class="logout-button" onclick="logout()">Sair</button>
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             // Decodificar e encontrar o cookie 'brasilheirinho'
             const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasilheirinho='));
 
             if (cookieData) {
                 // Extrair os valores do cookie
                 const sessionData = cookieData.split('=')[1].split('|');
-                const nome = sessionData[0].replace('Nome: ', '').trim().replace("+"," ");
-            
+                const nome = sessionData[0].replace('Nome: ', '').trim().replace("+", " ");
                 const cpfRazao = sessionData[1].replace('CPF/CNPJ: ', '').trim();
                 const numConta = parseInt(sessionData[2].replace('Número da Conta: ', '').trim(), 10);
                 const balanco = parseFloat(sessionData[3].replace('Balanço: ', '').trim());
-
-                // Exibir os dados no console para verificação
-                console.log("Nome:", nome);
-                console.log("CPF/CNPJ:", cpfRazao);
-                console.log("Número da Conta:", numConta);
-                console.log("Balanço:", balanco);
+                const tipoConta = parseInt(sessionData[4].replace('TipoConta: ', '').trim()); // Corrigido para capturar 'TipoConta'
 
                 // Atualizar a interface com os dados do cookie
                 document.getElementById('accountName').textContent = nome;
                 document.getElementById('accountCPF').textContent = cpfRazao;
                 document.getElementById('accountNumber').textContent = numConta;
                 document.getElementById('accountBalance').textContent = balanco.toFixed(2);
+
+                // Armazenar o tipoConta globalmente para uso posterior
+                window.tipoConta = tipoConta;
             }
         });
+
+        function deposit() {
+            const accountId = document.getElementById('accountNumber').textContent;
+            const amount = document.getElementById('depositAmount').value;
+            const tipoConta = window.tipoConta; // Acessar o tipo de conta do cookie
+
+            if (amount) {
+                const payload = {
+                    idConta: parseInt(accountId),
+                    valor: parseFloat(amount),
+                    tipoconta: tipoConta // Usar o tipoConta extraído do cookie
+                };
+                fetch('/somaLocal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Atualizar balanço na interface após depósito
+                            document.getElementById('accountBalance').textContent = data.newBalance.toFixed(2);
+                            alert('Depósito realizado com sucesso!');
+                        } else {
+                            alert('Erro ao realizar depósito: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                    });
+            } else {
+                alert('Por favor, insira um valor para depositar.');
+            }
+        }
+
+        function withdraw() {
+            const accountId = document.getElementById('accountNumber').textContent;
+            const amount = document.getElementById('withdrawAmount').value;
+            const tipoConta = window.tipoConta; // Acessar o tipo de conta do cookie
+
+            if (amount) {
+                const payload = {
+                    idConta: parseInt(accountId),
+                    valor: -parseFloat(amount),
+                    tipoconta: tipoConta // Usar o tipoConta extraído do cookie
+                };
+                fetch('/somaLocal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Atualizar balanço na interface após saque
+                            document.getElementById('accountBalance').textContent = data.newBalance.toFixed(2);
+                            alert('Saque realizado com sucesso!');
+                        } else {
+                            alert('Erro ao realizar saque: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                    });
+            } else {
+                alert('Por favor, insira um valor para retirar.');
+            }
+        }
 
         function logout() {
             // Limpar o cookie 'brasilheirinho'
@@ -85,4 +195,5 @@
         }
     </script>
 </body>
+
 </html>

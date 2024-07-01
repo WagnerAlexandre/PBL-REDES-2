@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # URL base do servidor
-BASE_URL="http://localhost:8080"
+BASE_URL="http://localhost:65501"
 
 # Função para listar contas PF
 list_accounts_pf() {

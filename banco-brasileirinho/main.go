@@ -23,6 +23,7 @@ type ContaPF struct {
 	Senha    string  `json:"senha"`
 	Tipo     int     `json:"tipo"`
 	Balanco  float64 `json:"balanco"`
+	mutex    sync.Mutex
 }
 
 type ContaPJ struct {
@@ -32,6 +33,7 @@ type ContaPJ struct {
 	Senha    string  `json:"senha"`
 	Tipo     int     `json:"tipo"`
 	Balanco  float64 `json:"balanco"`
+	mutex    sync.Mutex
 }
 
 type ContaCJ struct {
@@ -42,6 +44,7 @@ type ContaCJ struct {
 	Senha    string  `json:"senha"`
 	Tipo     int     `json:"tipo"`
 	Balanco  float64 `json:"balanco"`
+	mutex    sync.Mutex
 }
 
 type Login struct {
@@ -107,6 +110,8 @@ func main() {
 	router.POST("/criarContaPF", rota_Cadastrar_PF)
 	router.POST("/criarContaPJ", rota_Cadastrar_PJ)
 	router.POST("/criarContaCJ", rota_Cadastrar_CJ)
+	router.POST("/somaLocal", somaLocalHandler)
+
 	router.GET("/contasPF", getContasPF)
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
@@ -120,6 +125,51 @@ func main() {
 }
 
 // Funções de manipulação de dados
+type Transacao struct {
+	IDConta   int     `json:"idConta"`
+	TipoConta int     `json:"tipoconta"`
+	Valor     float64 `json:"valor"`
+}
+
+func somaLocalHandler(c *gin.Context) {
+	var transacao Transacao
+	if err := c.BindJSON(&transacao); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	if transacao.TipoConta == 1 {
+		if contaPF, exists := TContasPF[transacao.IDConta]; exists {
+			contaPF.mutex.Lock()
+			defer contaPF.mutex.Unlock()
+
+			contaPF.Balanco += transacao.Valor
+			c.JSON(http.StatusOK, gin.H{"success": true, "newBalance": contaPF.Balanco})
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+		}
+	} else if transacao.TipoConta == 2 {
+		if contaPJ, exists := TContasPJ[transacao.IDConta]; exists {
+			contaPJ.mutex.Lock()
+			defer contaPJ.mutex.Unlock()
+
+			contaPJ.Balanco += transacao.Valor
+			c.JSON(http.StatusOK, gin.H{"success": true, "newBalance": contaPJ.Balanco})
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+		}
+	} else if transacao.TipoConta == 3 {
+		if contaCJ, exists := TContasCJ[transacao.IDConta]; exists {
+			contaCJ.mutex.Lock()
+			defer contaCJ.mutex.Unlock()
+
+			contaCJ.Balanco += transacao.Valor
+			c.JSON(http.StatusOK, gin.H{"success": true, "newBalance": contaCJ.Balanco})
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+		}
+	}
+}
 
 func criar_NumConta() int {
 	mutexCriacao.Lock()
@@ -176,6 +226,7 @@ func loginHandler(c *gin.Context) {
 	var conta interface{}
 	var nome, cpfRazao string
 	var balanco float64
+	var tipo int
 
 	switch req.Tipo {
 	case 1:
@@ -184,6 +235,7 @@ func loginHandler(c *gin.Context) {
 			nome = c.Nome
 			cpfRazao = c.CPF
 			balanco = c.Balanco
+			tipo = 1
 		}
 	case 2:
 		if c, exists := TContasPJ[req.NumConta]; exists && c.Senha == req.Senha && c.CNPJ == req.CPFRAZAO {
@@ -191,6 +243,7 @@ func loginHandler(c *gin.Context) {
 			nome = c.Nome
 			cpfRazao = c.CNPJ
 			balanco = c.Balanco
+			tipo = 2
 		}
 	case 3:
 		if c, exists := TContasCJ[req.NumConta]; exists && c.Senha == req.Senha {
@@ -198,6 +251,7 @@ func loginHandler(c *gin.Context) {
 			nome = c.Nome
 			cpfRazao = c.CPF1 + " e " + c.CPF2
 			balanco = c.Balanco
+			tipo = 3
 		}
 	default:
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tipo de conta inválido"})
@@ -207,7 +261,7 @@ func loginHandler(c *gin.Context) {
 	if conta != nil {
 		// Construir o valor do cookie
 		// nome, cpfRazao, req.NumConta, balanco)
-		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f", nome, cpfRazao, req.NumConta, balanco)
+		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f|%d", nome, cpfRazao, req.NumConta, balanco, tipo)
 		// Definir o cookie no contexto da requisição
 		c.SetCookie("brasilheirinho", cookieValue, 3600, "/", "localhost", false, false)
 
@@ -236,7 +290,7 @@ func rota_Cadastrar_PF(c *gin.Context) {
 	conta.Tipo = 1 // Tipo para Pessoa Física
 
 	criar_conta_pf(&conta)
-	c.JSON(http.StatusCreated, gin.H{"message": "Conta criada com sucesso", "conta": conta})
+	c.JSON(http.StatusCreated, gin.H{"message": "Conta criada com sucesso"})
 }
 
 func rota_Cadastrar_PJ(c *gin.Context) {
