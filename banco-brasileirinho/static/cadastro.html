@@ -112,6 +112,7 @@
 
         <button type="submit">Cadastrar</button>
         <a class="link-acessar-conta" href="http://localhost:65501/inicial">Já possui uma conta? Acesse aqui.</a>
+
     </form>
     <div id="result"></div>
 </div>
@@ -204,7 +205,7 @@ document.getElementById('registerForm').addEventListener('submit', function(even
     document.getElementById('result').textContent = 'Conta criada com sucesso! Redirecionando...';
 
     setTimeout(() => {
-        window.location.href = 'menuprincipal.html';
+        window.location.href = '/menuprincipal';
     }, 2000);
 }).catch(error => {
     console.error('Error:', error);

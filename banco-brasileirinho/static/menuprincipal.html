@@ -51,33 +51,38 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-    const cookieData = document.cookie.split('; ').find(row => row.startsWith('bankSession='));
-    if (cookieData) {
-        const sessionData = cookieData.split('=')[1].split('|');
-        const nome = sessionData[0];
-        const cpfRazao = sessionData[1];
-        const numConta = sessionData[2];
-        const balanco = sessionData[3];
+            // Decodificar e encontrar o cookie 'brasilheirinho'
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasilheirinho='));
 
-        // Exemplo de uso dos dados do cookie
-        console.log("Nome:", nome);
-        console.log("CPF/Razão:", cpfRazao);
-        console.log("Número da Conta:", numConta);
-        console.log("Balanço:", balanco);
+            if (cookieData) {
+                // Extrair os valores do cookie
+                const sessionData = cookieData.split('=')[1].split('|');
+                const nome = sessionData[0].replace('Nome: ', '').trim().replace("+"," ");
+            
+                const cpfRazao = sessionData[1].replace('CPF/CNPJ: ', '').trim();
+                const numConta = parseInt(sessionData[2].replace('Número da Conta: ', '').trim(), 10);
+                const balanco = parseFloat(sessionData[3].replace('Balanço: ', '').trim());
 
-        // Atualizar interface com os dados do cookie
-        document.getElementById('accountName').textContent = nome;
-        document.getElementById('accountCPF').textContent = cpfRazao;
-        document.getElementById('accountNumber').textContent = numConta;
-        document.getElementById('accountBalance').textContent = balanco;
-    }
-});
+                // Exibir os dados no console para verificação
+                console.log("Nome:", nome);
+                console.log("CPF/CNPJ:", cpfRazao);
+                console.log("Número da Conta:", numConta);
+                console.log("Balanço:", balanco);
 
+                // Atualizar a interface com os dados do cookie
+                document.getElementById('accountName').textContent = nome;
+                document.getElementById('accountCPF').textContent = cpfRazao;
+                document.getElementById('accountNumber').textContent = numConta;
+                document.getElementById('accountBalance').textContent = balanco.toFixed(2);
+            }
+        });
 
-    function logout() {
-        document.cookie = "bankSession=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        window.location.href = 'http://localhost:65501/inicial';
-    }
+        function logout() {
+            // Limpar o cookie 'brasilheirinho'
+            document.cookie = "brasilheirinho=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            // Redirecionar para a página de login
+            window.location.href = 'http://localhost:65501/inicial';
+        }
     </script>
 </body>
 </html>

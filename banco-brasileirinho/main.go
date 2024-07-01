@@ -205,8 +205,12 @@ func loginHandler(c *gin.Context) {
 	}
 
 	if conta != nil {
+		// Construir o valor do cookie
+		// nome, cpfRazao, req.NumConta, balanco)
 		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f", nome, cpfRazao, req.NumConta, balanco)
-		c.SetCookie("brasilheirinho", cookieValue, 3600, "/banco-brasileirinho", "localhost", false, false)
+		// Definir o cookie no contexto da requisição
+		c.SetCookie("brasilheirinho", cookieValue, 3600, "/", "localhost", false, false)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
 	} else {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciais inválidas"})
