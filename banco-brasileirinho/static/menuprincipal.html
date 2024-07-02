@@ -63,6 +63,10 @@
             background-color: #f44336;
         }
 
+        .transfer-button {
+            background-color: #ff5722;
+        }
+
         .logout-button {
             background-color: #0d47a1;
             margin-top: 10px;
@@ -85,6 +89,11 @@
             <div>
                 <input type="number" id="withdrawAmount" placeholder="Valor para retirar">
                 <button class="withdraw-button" onclick="withdraw()">Retirar</button>
+            </div>
+            <div>
+                <a href=":65501/transferir"> <!-- Link para o endpoint de transferência -->
+                    <button class="transfer-button">Transferir para outra conta</button>
+                </a>
             </div>
         </div>
         <button class="logout-button" onclick="logout()">Sair</button>
@@ -159,10 +168,10 @@
             if (amount) {
                 const payload = {
                     idConta: parseInt(accountId),
-                    valor: -parseFloat(amount),
+                    valor: parseFloat(amount),
                     tipoconta: tipoConta // Usar o tipoConta extraído do cookie
                 };
-                fetch('/somaLocal', {
+                fetch('/reducaoLocal', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

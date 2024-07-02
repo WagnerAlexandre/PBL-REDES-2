@@ -87,11 +87,11 @@
         <button type="submit">Entrar</button>
     </form>
     <div id="result"></div>
-    <a class="create-account-link" href="http://localhost:65501/cadastro">Não tem uma conta? Crie aqui.</a>
+    <a class="create-account-link" href="/cadastro">Não tem uma conta? Crie aqui.</a>
 </div>
 
 <script>
-    const ATUAL = "http://localhost:65501"; // Defina a URL correta
+    const ATUAL = ":65501"; // Defina a URL correta
     
     document.getElementById('loginForm').addEventListener('submit', function(event) {
         event.preventDefault();
@@ -122,7 +122,7 @@
             
             // Redirecionamento após 2 segundos
             setTimeout(() => {
-                window.location.href = 'http://localhost:65501/menuprincipal';
+                window.location.href = ':65501/menuprincipal';
             }, 2000);
         }).catch(error => {
             console.error('Error:', error);
