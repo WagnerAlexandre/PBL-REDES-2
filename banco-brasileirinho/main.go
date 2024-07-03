@@ -60,6 +60,12 @@ type CadastroCJ struct {
 	Senha string `json:"senha"`
 }
 
+type Transacao struct {
+	IDConta   int     `json:"idConta"`
+	TipoConta int     `json:"tipoconta"`
+	Valor     float64 `json:"valor"`
+}
+
 var (
 	mutexCriacao  = &sync.Mutex{}
 	numero_contas = 1
@@ -107,7 +113,7 @@ func main() {
 	router.POST("/somaLocal", somaLocalHandler)
 	router.POST("/reducaoLocal", reducaoLocalHandler)
 
-	// manipulacao admin
+	// Manipulação admin
 	router.GET("/contasPF", getContasPF)
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
@@ -121,17 +127,10 @@ func main() {
 		BG    = "65502"
 		ATUAL = BB
 	)
-	fmt.Printf("Servidor rodando em http://%s"+"%s\n", HOST, serverPort)
+	fmt.Printf("Servidor rodando em http://%s%s\n", HOST, serverPort)
 	if err := router.Run(HOST + serverPort); err != nil {
 		panic(err)
 	}
-}
-
-// Funções de manipulação de dados
-type Transacao struct {
-	IDConta   int     `json:"idConta"`
-	TipoConta int     `json:"tipoconta"`
-	Valor     float64 `json:"valor"`
 }
 
 func reducaoLocalHandler(c *gin.Context) {
@@ -353,8 +352,6 @@ func salvarCookieNumConta(c *gin.Context, NumConta string) {
 	http.SetCookie(c.Writer, cookie)
 }
 
-// Funcao para manipular login
-
 func loginHandler(c *gin.Context) {
 	var req Login
 	if err := c.BindJSON(&req); err != nil {
@@ -399,7 +396,6 @@ func loginHandler(c *gin.Context) {
 
 	if conta != nil {
 		// Construir o valor do cookie
-		// nome, cpfRazao, req.NumConta, balanco)
 		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f|%d", nome, cpfRazao, req.NumConta, balanco, tipo)
 		// Definir o cookie no contexto da requisição
 		c.SetCookie("brasilheirinho", cookieValue, 3600, "/", "localhost", false, false)
