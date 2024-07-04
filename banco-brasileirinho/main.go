@@ -87,7 +87,7 @@ var (
 
 type Conta struct {
 	ID      int     `json:"id"`
-	Nome    string  `json:"tipo"`
+	Nome    string  `json:"nome"`
 	Balanco float64 `json:"balanco"`
 }
 

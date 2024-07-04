@@ -149,7 +149,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasilheirinho='));
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('gringuesco='));
 
             if (cookieData) {
                 const sessionData = cookieData.split('=')[1].split('|');
@@ -239,40 +239,46 @@
         }
 
         function searchAccount() {
-            const accountNumber = document.getElementById('transferAccountNumber').value;
-            const bankName = document.getElementById('transferBankName').value;
+    const accountNumber = document.getElementById('transferAccountNumber').value;
+    const bankName = document.getElementById('transferBankName').value;
 
-            if (accountNumber && bankName) {
-                const payload = {
-                    numConta: parseInt(accountNumber),
-                    banco: bankName
-                };
+    if (accountNumber && bankName) {
+        const payload = {
+            numConta: parseInt(accountNumber),
+            banco: bankName
+        };
 
-                fetch('/procurarConta', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.numconta && data.nome && data.banco) {
-                            document.getElementById('popupAccountNumber').textContent = data.numconta;
-                            document.getElementById('popupAccountName').textContent = data.nome;
-                            document.getElementById('popupBankName').textContent = data.banco;
-                            document.getElementById('popup').style.display = 'block';
-                        } else {
-                            alert('Conta não encontrada.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erro:', error);
-                    });
-            } else {
-                alert('Por favor, insira o número da conta e o banco.');
+        fetch('/procurarConta', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar conta');
             }
-        }
+            return response.json();
+        })
+        .then(data => {
+            if (data.numconta && data.nome && data.banco) {
+                document.getElementById('popupAccountNumber').textContent = data.numconta;
+                document.getElementById('popupAccountName').textContent = data.nome;
+                document.getElementById('popupBankName').textContent = data.banco;
+                document.getElementById('popup').style.display = 'block';
+            } else {
+                alert('Conta não encontrada.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao buscar conta. Verifique sua conexão ou tente novamente mais tarde.');
+        });
+    } else {
+        alert('Por favor, insira o número da conta e o banco.');
+    }
+}
 
         function confirmTransfer() {
             const accountNumber = document.getElementById('popupAccountNumber').textContent;
@@ -290,7 +296,7 @@
         }
 
         function logout() {
-            document.cookie = "brasilheirinho=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "gringuesco=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             window.location.href = '/inicial';
         }
     </script>

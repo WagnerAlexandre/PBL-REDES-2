@@ -45,18 +45,34 @@
         #confirm-transfer:hover {
             background-color: #0056b3;
         }
+
+        #cancel-transfer {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #dc3545;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #cancel-transfer:hover {
+            background-color: #bd2130;
+        }
     </style>
 </head>
 
 <body>
 
-    <h1>Transferência de Contas - Banco Gringuesco</h1Gringuesco
+    <h1>Transferência de Contas - Banco Gringuesco</h1>
 
     <div id="accounts-container">
         <!-- Accounts will be dynamically added here -->
     </div>
 
     <button id="confirm-transfer">Confirmar Transferência</button>
+    <button id="cancel-transfer">Cancelar Transferência</button>
 
     <script>
 
@@ -146,6 +162,11 @@
                 console.error('Erro:', error);
                 alert('Erro ao realizar transferência. Por favor, tente novamente.');
             });
+        });
+
+        document.getElementById('cancel-transfer').addEventListener('click', function () {
+            // Redirect to menuprincipal endpoint on cancel
+            window.location.href = '/menuprincipal';
         });
     </script>
 

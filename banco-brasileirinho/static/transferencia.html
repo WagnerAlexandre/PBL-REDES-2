@@ -45,6 +45,21 @@
         #confirm-transfer:hover {
             background-color: #0056b3;
         }
+
+        #cancel-transfer {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #dc3545;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #cancel-transfer:hover {
+            background-color: #bd2130;
+        }
     </style>
 </head>
 
@@ -57,6 +72,7 @@
     </div>
 
     <button id="confirm-transfer">Confirmar Transferência</button>
+    <button id="cancel-transfer">Cancelar Transferência</button>
 
     <script>
 
@@ -97,9 +113,8 @@
         });
 
         function getCpfCnpjFromCookie() {
-            // Implement logic to get CPF/CNPJ from cookie 'brasilheirinho'
-            // Example function:
-            var cookieName = 'brasilheirinho';
+
+            var cookieName = 'Brasileirinho';
             var name = cookieName + "=";
             var decodedCookie = decodeURIComponent(document.cookie);
             var cookieArray = decodedCookie.split(';');
@@ -147,6 +162,11 @@
                 console.error('Erro:', error);
                 alert('Erro ao realizar transferência. Por favor, tente novamente.');
             });
+        });
+
+        document.getElementById('cancel-transfer').addEventListener('click', function () {
+            // Redirect to menuprincipal endpoint on cancel
+            window.location.href = '/menuprincipal';
         });
     </script>
 
