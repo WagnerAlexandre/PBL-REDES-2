@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,22 +61,19 @@
         }
     </style>
 </head>
-
 <body>
 
     <h1>Transferência de Contas - Banco Gringuesco</h1>
 
     <div id="accounts-container">
-        <!-- Accounts will be dynamically added here -->
+        <!-- Contas serão adicionadas dinamicamente aqui -->
     </div>
 
     <button id="confirm-transfer">Confirmar Transferência</button>
     <button id="cancel-transfer">Cancelar Transferência</button>
 
     <script>
-
         document.addEventListener('DOMContentLoaded', function () {
-            // Make a POST request to getContas endpoint
             fetch('/getContas', {
                 method: 'POST',
                 headers: {
@@ -93,13 +89,13 @@
                     throw new Error('Erro ao buscar contas');
                 }
             }).then(data => {
-                // Populate accounts in the HTML
                 const accountsContainer = document.getElementById('accounts-container');
                 data.forEach(account => {
                     const accountDiv = document.createElement('div');
                     accountDiv.classList.add('account-container');
                     accountDiv.innerHTML = `
-                        <h2>Conta ${account.numConta}</h2>
+                        <h2>Conta ${account.nome} - ${account.Banco}</h2> <!-- Exibindo o nome do banco -->
+                        <h2>Numero ${account.id} </h2>
                         <p>Saldo: R$ ${account.balanco.toFixed(2)}</p>
                         <label for="transfer-${account.numConta}">Transferir:</label>
                         <input type="number" id="transfer-${account.numConta}" class="transfer-field" min="0">
@@ -113,7 +109,6 @@
         });
 
         function getCpfCnpjFromCookie() {
-
             var cookieName = 'gringuesco';
             var name = cookieName + "=";
             var decodedCookie = decodeURIComponent(document.cookie);
@@ -130,7 +125,6 @@
         }
 
         document.getElementById('confirm-transfer').addEventListener('click', function () {
-            // Prepare transfer data and send to realizarTransferencia endpoint
             var transfers = [];
             var accounts = document.querySelectorAll('.account-container');
             accounts.forEach(account => {
@@ -165,11 +159,9 @@
         });
 
         document.getElementById('cancel-transfer').addEventListener('click', function () {
-            // Redirect to menuprincipal endpoint on cancel
             window.location.href = '/menuprincipal';
         });
     </script>
 
 </body>
-
 </html>

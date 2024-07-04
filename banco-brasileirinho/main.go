@@ -89,6 +89,7 @@ type Conta struct {
 	ID      int     `json:"id"`
 	Nome    string  `json:"nome"`
 	Balanco float64 `json:"balanco"`
+	Banco   string  `json:"Banco"`
 }
 
 // Execução do servidor
@@ -159,6 +160,7 @@ func main() {
 					ID:      conta.NumConta,
 					Nome:    conta.Nome,
 					Balanco: conta.Balanco,
+					Banco:   ENDPNT,
 				})
 			}
 		}
@@ -170,6 +172,7 @@ func main() {
 					ID:      conta.NumConta,
 					Nome:    conta.Nome,
 					Balanco: conta.Balanco,
+					Banco:   ENDPNT,
 				})
 			}
 		}
@@ -181,6 +184,7 @@ func main() {
 					ID:      conta.NumConta,
 					Nome:    conta.Nome,
 					Balanco: conta.Balanco,
+					Banco:   ENDPNT,
 				})
 			}
 		}
@@ -331,26 +335,41 @@ func retornarContas(c *gin.Context) {
 	cpfCnpj := cookieParts[1]
 
 	// Inicializar o slice de contas
-	var contas []interface{}
+	var contas []Conta
 
 	// Buscar as contas PF associadas ao CPF
 	if contasPF, exists := IndexcontasPF[cpfCnpj]; exists {
 		for _, conta := range contasPF {
-			contas = append(contas, conta)
+			contas = append(contas, Conta{
+				ID:      conta.NumConta,
+				Nome:    conta.Nome,
+				Balanco: conta.Balanco,
+				Banco:   ENDPNT,
+			})
 		}
 	}
 
 	// Buscar as contas CJ associadas ao CPF
 	if contasCJ, exists := IndexcontasCJ[cpfCnpj]; exists {
 		for _, conta := range contasCJ {
-			contas = append(contas, conta)
+			contas = append(contas, Conta{
+				ID:      conta.NumConta,
+				Nome:    conta.Nome,
+				Balanco: conta.Balanco,
+				Banco:   ENDPNT,
+			})
 		}
 	}
 
 	// Buscar as contas PJ associadas ao CNPJ
 	if contasPJ, exists := IndexcontasPJ[cpfCnpj]; exists {
 		for _, conta := range contasPJ {
-			contas = append(contas, conta)
+			contas = append(contas, Conta{
+				ID:      conta.NumConta,
+				Nome:    conta.Nome,
+				Balanco: conta.Balanco,
+				Banco:   ENDPNT,
+			})
 		}
 	}
 
@@ -376,14 +395,14 @@ func retornarContas(c *gin.Context) {
 	c.JSON(http.StatusOK, contas)
 }
 
-func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]interface{}, error) {
+func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]Conta, error) {
 	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var contas []interface{}
+	var contas []Conta
 	err = json.NewDecoder(resp.Body).Decode(&contas)
 	if err != nil {
 		return nil, err
@@ -392,14 +411,14 @@ func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]interface{}, error) {
 	return contas, nil
 }
 
-func getUnicaChaveContasFromBG(cpfCnpj string) ([]interface{}, error) {
+func getUnicaChaveContasFromBG(cpfCnpj string) ([]Conta, error) {
 	resp, err := http.Get("http://localhost:65502/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var contas []interface{}
+	var contas []Conta
 	err = json.NewDecoder(resp.Body).Decode(&contas)
 	if err != nil {
 		return nil, err
