@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gin-contrib/cors"
@@ -80,6 +84,17 @@ var (
 	IndexcontasCJ = make(map[string][]*ContaCJ)
 )
 
+// Execução do servidor
+
+const (
+	HOST   = "localhost"
+	BBMN   = ":65500"
+	BB     = ":65501"
+	BG     = ":65502"
+	ATUAL  = BB
+	ENDPNT = "BB"
+)
+
 func main() {
 	router := gin.Default()
 
@@ -105,6 +120,11 @@ func main() {
 		c.File("./static/menuprincipal.html")
 	})
 
+	// rota para a página de transferência
+	router.GET("/transferencia", func(c *gin.Context) {
+		c.File("./static/transferencia.html")
+	})
+
 	// Rotas da API
 	router.POST("/login", loginHandler)
 	router.POST("/criarContaPF", rota_Cadastrar_PF)
@@ -112,25 +132,168 @@ func main() {
 	router.POST("/criarContaCJ", rota_Cadastrar_CJ)
 	router.POST("/somaLocal", somaLocalHandler)
 	router.POST("/reducaoLocal", reducaoLocalHandler)
+	router.POST("/getContas", retornarContas)
+	router.POST("/procurarConta", procuraConta)
 
 	// Manipulação admin
 	router.GET("/contasPF", getContasPF)
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
 
-	// Execução do servidor
-	serverPort := ":65501"
-	const (
-		HOST  = "0.0.0.0"
-		BBMN  = "65500"
-		BB    = "65501"
-		BG    = "65502"
-		ATUAL = BB
-	)
-	fmt.Printf("Servidor rodando em http://%s%s\n", HOST, serverPort)
-	if err := router.Run(HOST + serverPort); err != nil {
+	fmt.Printf("Servidor rodando em http://%s:%s\n", HOST, ATUAL)
+	if err := router.Run(HOST + ATUAL); err != nil {
 		panic(err)
 	}
+}
+
+type ContaRequest struct {
+	NumConta int    `json:"numconta"`
+	Banco    string `json:"banco"`
+}
+
+type ContaResponse struct {
+	NumConta int    `json:"numconta"`
+	Nome     string `json:"nome"`
+	Banco    string `json:"banco"`
+}
+
+func procuraConta(c *gin.Context) {
+	var request ContaRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	banco := request.Banco
+	numConta := request.NumConta
+
+	if banco == "BB" {
+		// Procura localmente
+		if contaPF, ok := TContasPF[numConta]; ok {
+			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPF.NumConta, Nome: contaPF.Nome, Banco: ENDPNT})
+			return
+		}
+		if contaPJ, ok := TContasPJ[numConta]; ok {
+			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPJ.NumConta, Nome: contaPJ.Nome, Banco: ENDPNT})
+			return
+		}
+		if contaCJ, ok := TContasCJ[numConta]; ok {
+			c.JSON(http.StatusOK, ContaResponse{NumConta: contaCJ.NumConta, Nome: contaCJ.Nome, Banco: ENDPNT})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+		return
+	}
+
+	// Redireciona para outros servidores
+	var endpoint string
+	if banco == "BBMN" {
+		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BBMN)
+	} else if banco == "BG" {
+		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BG)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Banco desconhecido"})
+		return
+	}
+
+	client := &http.Client{}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar JSON"})
+		return
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		// Imprimir o erro para diagnóstico
+		println("Erro ao criar requisição:", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar requisição"})
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		println("Erro ao criar requisição:", err.Error())
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao fazer requisição"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		println("Erro ao criar requisição:", err.Error())
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao ler resposta"})
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+
+		c.JSON(resp.StatusCode, gin.H{"error": string(body)})
+		return
+	}
+
+	var response ContaResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		println("Erro ao criar requisição:", err.Error())
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao analisar resposta"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func retornarContas(c *gin.Context) {
+	// Obter o valor do cookie
+	cookie, err := c.Cookie("brasilheirinho")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Não foi possível obter o cookie"})
+		return
+	}
+
+	// Extrair o CPF/CNPJ do cookie
+	cookieParts := strings.Split(cookie, "|")
+	if len(cookieParts) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Formato do cookie inválido"})
+		return
+	}
+	cpfCnpj := cookieParts[1]
+
+	// Inicializar o slice de contas
+	var contas []interface{}
+
+	// Buscar as contas PF associadas ao CPF
+	if contasPF, exists := IndexcontasPF[cpfCnpj]; exists {
+		for _, conta := range contasPF {
+			contas = append(contas, conta)
+		}
+	}
+
+	// Buscar as contas CJ associadas ao CPF
+	if contasCJ, exists := IndexcontasCJ[cpfCnpj]; exists {
+		for _, conta := range contasCJ {
+			contas = append(contas, conta)
+		}
+	}
+
+	// Buscar as contas PJ associadas ao CNPJ
+	if contasPJ, exists := IndexcontasPJ[cpfCnpj]; exists {
+		for _, conta := range contasPJ {
+			contas = append(contas, conta)
+		}
+	}
+
+	// Verificar se há contas
+	if len(contas) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Nenhuma conta encontrada"})
+		return
+	}
+
+	// Retornar as contas em formato JSON
+	c.JSON(http.StatusOK, contas)
 }
 
 func reducaoLocalHandler(c *gin.Context) {

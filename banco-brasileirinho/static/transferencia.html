@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transferência de Contas - Banco Brasileirinho</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+        }
+
+        .account-container {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+        }
+
+        .account-container h2 {
+            margin-top: 0;
+        }
+
+        .transfer-field {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #confirm-transfer {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #confirm-transfer:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Transferência de Contas - Banco Brasileirinho</h1>
+
+    <div id="accounts-container">
+        <!-- Accounts will be dynamically added here -->
+    </div>
+
+    <button id="confirm-transfer">Confirmar Transferência</button>
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Make a POST request to getContas endpoint
+            fetch('/getContas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cpfCnpj: getCpfCnpjFromCookie()
+                })
+            }).then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('Erro ao buscar contas');
+                }
+            }).then(data => {
+                // Populate accounts in the HTML
+                const accountsContainer = document.getElementById('accounts-container');
+                data.forEach(account => {
+                    const accountDiv = document.createElement('div');
+                    accountDiv.classList.add('account-container');
+                    accountDiv.innerHTML = `
+                        <h2>Conta ${account.numConta}</h2>
+                        <p>Saldo: R$ ${account.balanco.toFixed(2)}</p>
+                        <label for="transfer-${account.numConta}">Transferir:</label>
+                        <input type="number" id="transfer-${account.numConta}" class="transfer-field" min="0">
+                    `;
+                    accountsContainer.appendChild(accountDiv);
+                });
+            }).catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao buscar contas. Por favor, tente novamente.');
+            });
+        });
+
+        function getCpfCnpjFromCookie() {
+            // Implement logic to get CPF/CNPJ from cookie 'brasilheirinho'
+            // Example function:
+            var cookieName = 'brasilheirinho';
+            var name = cookieName + "=";
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var cookieArray = decodedCookie.split(';');
+            for (var i = 0; i < cookieArray.length; i++) {
+                var cookie = cookieArray[i].trim();
+                if (cookie.indexOf(name) === 0) {
+                    var cookieValue = cookie.substring(name.length, cookie.length);
+                    var values = cookieValue.split('|');
+                    return values[1]; // Assuming CPF/CNPJ is the second value in the cookie
+                }
+            }
+            return "";
+        }
+
+        document.getElementById('confirm-transfer').addEventListener('click', function () {
+            // Prepare transfer data and send to realizarTransferencia endpoint
+            var transfers = [];
+            var accounts = document.querySelectorAll('.account-container');
+            accounts.forEach(account => {
+                var numConta = account.querySelector('h2').textContent.split(' ')[1];
+                var transferField = account.querySelector('.transfer-field');
+                var amount = parseFloat(transferField.value);
+                if (!isNaN(amount) && amount > 0) {
+                    transfers.push({
+                        numConta: numConta,
+                        valor: amount
+                    });
+                }
+            });
+
+            fetch('/realizarTransferencia', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(transfers)
+            }).then(response => {
+                if (response.ok) {
+                    alert('Transferência realizada com sucesso!');
+                    window.location.href = '/menuprincipal'; 
+                } else {
+                    throw new Error('Erro ao realizar transferência');
+                }
+            }).catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao realizar transferência. Por favor, tente novamente.');
+            });
+        });
+    </script>
+
+</body>
+
+</html>
