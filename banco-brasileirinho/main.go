@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -243,6 +244,27 @@ func procuraConta(c *gin.Context) {
 		return
 	}
 
+	// Convertendo a estrutura ContaResponse para JSON
+	cookieJSON, err := json.Marshal(response)
+	if err != nil {
+		println("Erro ao codificar dados do cookie:", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao codificar dados do cookie"})
+		return
+	}
+
+	// Criando um cookie com os dados codificados em JSON
+	cookie := &http.Cookie{
+		Name:     "Alvo",
+		Value:    string(cookieJSON),
+		Path:     "/",
+		HttpOnly: false,
+		Expires:  time.Now().Add(1 * time.Hour), // Exemplo de expiração em 1 hora
+	}
+
+	// Definindo o cookie na resposta HTTP
+	http.SetCookie(c.Writer, cookie)
+
+	// Retornando os dados da conta como resposta JSON
 	c.JSON(http.StatusOK, response)
 }
 
