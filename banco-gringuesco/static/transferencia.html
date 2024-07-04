@@ -134,7 +134,9 @@
                 if (!isNaN(amount) && amount > 0) {
                     transfers.push({
                         numConta: numConta,
-                        valor: amount
+                        valor: amount,
+                        banco: account.Banco,
+                        tipo: 2
                     });
                 }
             });

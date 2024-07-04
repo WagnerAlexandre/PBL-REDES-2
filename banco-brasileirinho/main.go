@@ -1,5 +1,7 @@
 package main
 
+// Desenolvido com o meu paradigma favorito: XGH
+
 import (
 	"bytes"
 	"encoding/json"
@@ -9,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -92,6 +93,14 @@ type Conta struct {
 	Banco   string  `json:"Banco"`
 }
 
+// struct da operacao, se tipo == 1, soma o valor ao balanco, caso tipo == 2, reduz.
+type TransacaoWeb struct {
+	ID    int     `json:numConta`
+	Valor float64 `json:"valor"`
+	Banco string  `json:"banco"`
+	Tipo  int     `json:tipo`
+}
+
 // Execução do servidor
 
 const (
@@ -102,6 +111,25 @@ const (
 	ATUAL  = BB
 	ENDPNT = "BB"
 )
+
+// strutcs 2PC
+type PrepareRequest struct {
+	ID    int     `json:"id"`
+	Valor float64 `json:"valor"`
+	Tipo  int     `json:"tipo"`
+}
+
+type PrepareResponse struct {
+	Status string `json:"status"`
+}
+type PreparedTransaction struct {
+	ID    int
+	Valor float64
+	Tipo  int
+}
+
+var preparedTransactions = make(map[int]PreparedTransaction)
+var preparedMutex sync.Mutex
 
 func main() {
 	router := gin.Default()
@@ -142,12 +170,20 @@ func main() {
 	router.POST("/reducaoLocal", reducaoLocalHandler)
 	router.POST("/getContas", retornarContas)
 	router.POST("/procurarConta", procuraConta)
+	router.POST("/realizarTransferencia", iniciarTransferencia)
+
+	//Rotas 2PC
+	router.POST("/prepare", prepareHandler)
+	router.POST("/commit", commitHandler)
+	router.POST("/abort", abortHandler)
 
 	// Manipulação admin
 	router.GET("/contasPF", getContasPF)
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
 
+	// ROTA Query, para procurar contas relacionadas a um cpf/cnpj
+	// Rota para retornar contas associadas ao CPF/CNPJ do cliente
 	router.GET("/getUnicaChaveContas", func(c *gin.Context) {
 		cpfCnpj := c.Query("cpf_cnpj")
 
@@ -197,6 +233,282 @@ func main() {
 	}
 }
 
+// Helper function to convert PrepareRequest to JSON
+func (r PrepareRequest) toJSON() []byte {
+	data, _ := json.Marshal(r)
+	return data
+}
+
+// Prepare handler
+func prepareHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	var conta interface{}
+	var exists bool
+
+	conta, exists = TContasPF[request.ID]
+	if !exists {
+		conta, exists = TContasPJ[request.ID]
+		if !exists {
+			conta, exists = TContasCJ[request.ID]
+			if !exists {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+				return
+			}
+		}
+	}
+
+	var balanco *float64
+	var mutex *sync.Mutex
+
+	switch v := conta.(type) {
+	case *ContaPF:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaPJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaCJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if request.Tipo == 2 { // Redução de saldo
+		if *balanco < request.Valor {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo insuficiente"})
+			return
+		}
+	}
+
+	preparedMutex.Lock()
+	preparedTransactions[request.ID] = PreparedTransaction{
+		ID:    request.ID,
+		Valor: request.Valor,
+		Tipo:  request.Tipo,
+	}
+	preparedMutex.Unlock()
+
+	c.JSON(http.StatusOK, PrepareResponse{Status: "OK"})
+}
+
+// Commit handler
+func commitHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	preparedMutex.Lock()
+	transaction, exists := preparedTransactions[request.ID]
+	if !exists {
+		preparedMutex.Unlock()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+	delete(preparedTransactions, request.ID)
+	preparedMutex.Unlock()
+
+	var conta interface{}
+	var balanco *float64
+	var mutex *sync.Mutex
+
+	conta, exists = TContasPF[transaction.ID]
+	if !exists {
+		conta, exists = TContasPJ[transaction.ID]
+		if !exists {
+			conta, exists = TContasCJ[transaction.ID]
+			if !exists {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+				return
+			}
+		}
+	}
+
+	switch v := conta.(type) {
+	case *ContaPF:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaPJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaCJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if transaction.Tipo == 2 { // Redução de saldo
+		*balanco -= transaction.Valor
+	} else { // Aumento de saldo
+		*balanco += transaction.Valor
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "committed"})
+}
+
+// Abort handler
+func abortHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	preparedMutex.Lock()
+	// se a transacao preparada ainda existe
+	_, exists := preparedTransactions[request.ID]
+	if !exists {
+		preparedMutex.Unlock()
+		// If the transaction does not exist, return an error
+		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+	// Remove a transacao das transacoes preparadas
+	delete(preparedTransactions, request.ID)
+	// desbloqueia o mutex
+	preparedMutex.Unlock()
+
+	// retorna sucesso
+	c.JSON(http.StatusOK, gin.H{"status": "aborted"})
+}
+
+// Funções auxiliares para realizar as transações com 2PC
+func prepararTransacao(url string, request PrepareRequest) (bool, error) {
+	resp, err := http.Post(fmt.Sprintf("http://%s/prepare", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("prepare request failed")
+	}
+	return true, nil
+}
+
+func commitTransacao(url string, request PrepareRequest) error {
+	resp, err := http.Post(fmt.Sprintf("http://%s/commit", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("commit request failed")
+	}
+	return nil
+}
+
+func abortTransacao(url string, request PrepareRequest) error {
+	resp, err := http.Post(fmt.Sprintf("http://%s/abort", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("abort request failed")
+	}
+	return nil
+}
+
+// Função para iniciar a transferência utilizando 2PC
+func iniciarTransferencia(c *gin.Context) {
+	var requests []TransacaoWeb
+
+	if err := c.ShouldBindJSON(&requests); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	prepares := []PrepareRequest{}
+	bancoURLs := map[string]string{}
+
+	for _, request := range requests {
+		prepares = append(prepares, PrepareRequest{
+			ID:    request.ID,
+			Valor: request.Valor,
+			Tipo:  request.Tipo,
+		})
+		bancoURLs[request.Banco] = request.Banco
+	}
+
+	allPrepared := true
+	for _, url := range bancoURLs {
+		for _, prepare := range prepares {
+			ok, err := prepararTransacao(url, prepare)
+			if err != nil || !ok {
+				allPrepared = false
+				break
+			}
+		}
+		if !allPrepared {
+			break
+		}
+	}
+
+	if allPrepared {
+		for _, url := range bancoURLs {
+			for _, prepare := range prepares {
+				if err := commitTransacao(url, prepare); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Commit failed"})
+					return
+				}
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "Transferências realizadas com sucesso"})
+	} else {
+		for _, url := range bancoURLs {
+			for _, prepare := range prepares {
+				_ = abortTransacao(url, prepare)
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transferências abortadas"})
+	}
+}
+
+func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]Conta, error) {
+	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var contas []Conta
+	err = json.NewDecoder(resp.Body).Decode(&contas)
+	if err != nil {
+		return nil, err
+	}
+
+	return contas, nil
+}
+
+func getUnicaChaveContasFromBB(cpfCnpj string) ([]Conta, error) {
+	resp, err := http.Get("http://localhost:65501/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var contas []Conta
+	err = json.NewDecoder(resp.Body).Decode(&contas)
+	if err != nil {
+		return nil, err
+	}
+
+	return contas, nil
+}
+
 type ContaRequest struct {
 	NumConta int    `json:"numconta"`
 	Banco    string `json:"banco"`
@@ -218,7 +530,7 @@ func procuraConta(c *gin.Context) {
 	banco := request.Banco
 	numConta := request.NumConta
 
-	if banco == "BB" {
+	if banco == "BG" {
 		// Procura localmente
 		if contaPF, ok := TContasPF[numConta]; ok {
 			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPF.NumConta, Nome: contaPF.Nome, Banco: ENDPNT})
@@ -240,8 +552,8 @@ func procuraConta(c *gin.Context) {
 	var endpoint string
 	if banco == "BBMN" {
 		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BBMN)
-	} else if banco == "BG" {
-		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BG)
+	} else if banco == "BB" {
+		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BB)
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Banco desconhecido"})
 		return
@@ -294,33 +606,12 @@ func procuraConta(c *gin.Context) {
 		return
 	}
 
-	// Convertendo a estrutura ContaResponse para JSON
-	cookieJSON, err := json.Marshal(response)
-	if err != nil {
-		println("Erro ao codificar dados do cookie:", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao codificar dados do cookie"})
-		return
-	}
-
-	// Criando um cookie com os dados codificados em JSON
-	cookie := &http.Cookie{
-		Name:     "Alvo",
-		Value:    string(cookieJSON),
-		Path:     "/",
-		HttpOnly: false,
-		Expires:  time.Now().Add(1 * time.Hour), // Exemplo de expiração em 1 hora
-	}
-
-	// Definindo o cookie na resposta HTTP
-	http.SetCookie(c.Writer, cookie)
-
-	// Retornando os dados da conta como resposta JSON
 	c.JSON(http.StatusOK, response)
 }
 
 func retornarContas(c *gin.Context) {
 	// Obter o valor do cookie
-	cookie, err := c.Cookie("brasilheirinho")
+	cookie, err := c.Cookie("brasileirinho")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Não foi possível obter o cookie"})
 		return
@@ -380,7 +671,7 @@ func retornarContas(c *gin.Context) {
 	}
 
 	// Conectar ao banco BG e adicionar suas contas
-	bgContas, err := getUnicaChaveContasFromBG(cpfCnpj)
+	bgContas, err := getUnicaChaveContasFromBB(cpfCnpj)
 	if err == nil {
 		contas = append(contas, bgContas...)
 	}
@@ -393,38 +684,6 @@ func retornarContas(c *gin.Context) {
 
 	// Retornar as contas em formato JSON
 	c.JSON(http.StatusOK, contas)
-}
-
-func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]Conta, error) {
-	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var contas []Conta
-	err = json.NewDecoder(resp.Body).Decode(&contas)
-	if err != nil {
-		return nil, err
-	}
-
-	return contas, nil
-}
-
-func getUnicaChaveContasFromBG(cpfCnpj string) ([]Conta, error) {
-	resp, err := http.Get("http://localhost:65502/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var contas []Conta
-	err = json.NewDecoder(resp.Body).Decode(&contas)
-	if err != nil {
-		return nil, err
-	}
-
-	return contas, nil
 }
 
 func reducaoLocalHandler(c *gin.Context) {
@@ -692,7 +951,7 @@ func loginHandler(c *gin.Context) {
 		// Construir o valor do cookie
 		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f|%d", nome, cpfRazao, req.NumConta, balanco, tipo)
 		// Definir o cookie no contexto da requisição
-		c.SetCookie("brasilheirinho", cookieValue, 3600, "/", "localhost", false, false)
+		c.SetCookie("brasileirinho", cookieValue, 3600, "/", "localhost", false, false)
 
 		c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
 	} else {

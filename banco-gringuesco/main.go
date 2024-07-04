@@ -1,5 +1,7 @@
 package main
 
+// Desenolvido com o meu paradigma favorito: XGH
+
 import (
 	"bytes"
 	"encoding/json"
@@ -91,6 +93,14 @@ type Conta struct {
 	Banco   string  `json:"Banco"`
 }
 
+// struct da operacao, se tipo == 1, soma o valor ao balanco, caso tipo == 2, reduz.
+type TransacaoWeb struct {
+	ID    int     `json:numConta`
+	Valor float64 `json:"valor"`
+	Banco string  `json:"banco"`
+	Tipo  int     `json:tipo`
+}
+
 // Execução do servidor
 
 const (
@@ -101,6 +111,25 @@ const (
 	ATUAL  = BG
 	ENDPNT = "BG"
 )
+
+// strutcs 2PC
+type PrepareRequest struct {
+	ID    int     `json:"id"`
+	Valor float64 `json:"valor"`
+	Tipo  int     `json:"tipo"`
+}
+
+type PrepareResponse struct {
+	Status string `json:"status"`
+}
+type PreparedTransaction struct {
+	ID    int
+	Valor float64
+	Tipo  int
+}
+
+var preparedTransactions = make(map[int]PreparedTransaction)
+var preparedMutex sync.Mutex
 
 func main() {
 	router := gin.Default()
@@ -141,6 +170,12 @@ func main() {
 	router.POST("/reducaoLocal", reducaoLocalHandler)
 	router.POST("/getContas", retornarContas)
 	router.POST("/procurarConta", procuraConta)
+	router.POST("/realizarTransferencia", iniciarTransferencia)
+
+	//Rotas 2PC
+	router.POST("/prepare", prepareHandler)
+	router.POST("/commit", commitHandler)
+	router.POST("/abort", abortHandler)
 
 	// Manipulação admin
 	router.GET("/contasPF", getContasPF)
@@ -195,6 +230,250 @@ func main() {
 	fmt.Printf("Servidor rodando em http://%s:%s\n", HOST, ATUAL)
 	if err := router.Run(HOST + ATUAL); err != nil {
 		panic(err)
+	}
+}
+
+// Helper function to convert PrepareRequest to JSON
+func (r PrepareRequest) toJSON() []byte {
+	data, _ := json.Marshal(r)
+	return data
+}
+
+// Prepare handler
+func prepareHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	var conta interface{}
+	var exists bool
+
+	conta, exists = TContasPF[request.ID]
+	if !exists {
+		conta, exists = TContasPJ[request.ID]
+		if !exists {
+			conta, exists = TContasCJ[request.ID]
+			if !exists {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+				return
+			}
+		}
+	}
+
+	var balanco *float64
+	var mutex *sync.Mutex
+
+	switch v := conta.(type) {
+	case *ContaPF:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaPJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaCJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if request.Tipo == 2 { // Redução de saldo
+		if *balanco < request.Valor {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo insuficiente"})
+			return
+		}
+	}
+
+	preparedMutex.Lock()
+	preparedTransactions[request.ID] = PreparedTransaction{
+		ID:    request.ID,
+		Valor: request.Valor,
+		Tipo:  request.Tipo,
+	}
+	preparedMutex.Unlock()
+
+	c.JSON(http.StatusOK, PrepareResponse{Status: "OK"})
+}
+
+// Commit handler
+func commitHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	preparedMutex.Lock()
+	transaction, exists := preparedTransactions[request.ID]
+	if !exists {
+		preparedMutex.Unlock()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+	delete(preparedTransactions, request.ID)
+	preparedMutex.Unlock()
+
+	var conta interface{}
+	var balanco *float64
+	var mutex *sync.Mutex
+
+	conta, exists = TContasPF[transaction.ID]
+	if !exists {
+		conta, exists = TContasPJ[transaction.ID]
+		if !exists {
+			conta, exists = TContasCJ[transaction.ID]
+			if !exists {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Conta não encontrada"})
+				return
+			}
+		}
+	}
+
+	switch v := conta.(type) {
+	case *ContaPF:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaPJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	case *ContaCJ:
+		balanco = &v.Balanco
+		mutex = &v.mutex
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if transaction.Tipo == 2 { // Redução de saldo
+		*balanco -= transaction.Valor
+	} else { // Aumento de saldo
+		*balanco += transaction.Valor
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "committed"})
+}
+
+// Abort handler
+func abortHandler(c *gin.Context) {
+	var request PrepareRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	preparedMutex.Lock()
+	// se a transacao preparada ainda existe
+	_, exists := preparedTransactions[request.ID]
+	if !exists {
+		preparedMutex.Unlock()
+		// If the transaction does not exist, return an error
+		c.JSON(http.StatusNotFound, gin.H{"error": "Transaction not found"})
+		return
+	}
+	// Remove a transacao das transacoes preparadas
+	delete(preparedTransactions, request.ID)
+	// desbloqueia o mutex
+	preparedMutex.Unlock()
+
+	// retorna sucesso
+	c.JSON(http.StatusOK, gin.H{"status": "aborted"})
+}
+
+// Funções auxiliares para realizar as transações com 2PC
+func prepararTransacao(url string, request PrepareRequest) (bool, error) {
+	resp, err := http.Post(fmt.Sprintf("http://%s/prepare", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("prepare request failed")
+	}
+	return true, nil
+}
+
+func commitTransacao(url string, request PrepareRequest) error {
+	resp, err := http.Post(fmt.Sprintf("http://%s/commit", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("commit request failed")
+	}
+	return nil
+}
+
+func abortTransacao(url string, request PrepareRequest) error {
+	resp, err := http.Post(fmt.Sprintf("http://%s/abort", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("abort request failed")
+	}
+	return nil
+}
+
+// Função para iniciar a transferência utilizando 2PC
+func iniciarTransferencia(c *gin.Context) {
+	var requests []TransacaoWeb
+
+	if err := c.ShouldBindJSON(&requests); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	prepares := []PrepareRequest{}
+	bancoURLs := map[string]string{}
+
+	for _, request := range requests {
+		prepares = append(prepares, PrepareRequest{
+			ID:    request.ID,
+			Valor: request.Valor,
+			Tipo:  request.Tipo,
+		})
+		bancoURLs[request.Banco] = request.Banco
+	}
+
+	allPrepared := true
+	for _, url := range bancoURLs {
+		for _, prepare := range prepares {
+			ok, err := prepararTransacao(url, prepare)
+			if err != nil || !ok {
+				allPrepared = false
+				break
+			}
+		}
+		if !allPrepared {
+			break
+		}
+	}
+
+	if allPrepared {
+		for _, url := range bancoURLs {
+			for _, prepare := range prepares {
+				if err := commitTransacao(url, prepare); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Commit failed"})
+					return
+				}
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "Transferências realizadas com sucesso"})
+	} else {
+		for _, url := range bancoURLs {
+			for _, prepare := range prepares {
+				_ = abortTransacao(url, prepare)
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transferências abortadas"})
 	}
 }
 
