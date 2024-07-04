@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -98,8 +97,8 @@ const (
 	BBMN   = ":65500"
 	BB     = ":65501"
 	BG     = ":65502"
-	ATUAL  = BB
-	ENDPNT = "BB"
+	ATUAL  = BG
+	ENDPNT = "BG"
 )
 
 func main() {
@@ -147,6 +146,8 @@ func main() {
 	router.GET("/contasPJ", getContasPJ)
 	router.GET("/contasCJ", getContasCJ)
 
+	// ROTA Query, para procurar contas relacionadas a um cpf/cnpj
+	// Rota para retornar contas associadas ao CPF/CNPJ do cliente
 	router.GET("/getUnicaChaveContas", func(c *gin.Context) {
 		cpfCnpj := c.Query("cpf_cnpj")
 
@@ -193,6 +194,38 @@ func main() {
 	}
 }
 
+func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]interface{}, error) {
+	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var contas []interface{}
+	err = json.NewDecoder(resp.Body).Decode(&contas)
+	if err != nil {
+		return nil, err
+	}
+
+	return contas, nil
+}
+
+func getUnicaChaveContasFromBB(cpfCnpj string) ([]interface{}, error) {
+	resp, err := http.Get("http://localhost:65501/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var contas []interface{}
+	err = json.NewDecoder(resp.Body).Decode(&contas)
+	if err != nil {
+		return nil, err
+	}
+
+	return contas, nil
+}
+
 type ContaRequest struct {
 	NumConta int    `json:"numconta"`
 	Banco    string `json:"banco"`
@@ -214,7 +247,7 @@ func procuraConta(c *gin.Context) {
 	banco := request.Banco
 	numConta := request.NumConta
 
-	if banco == "BB" {
+	if banco == "BG" {
 		// Procura localmente
 		if contaPF, ok := TContasPF[numConta]; ok {
 			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPF.NumConta, Nome: contaPF.Nome, Banco: ENDPNT})
@@ -236,8 +269,8 @@ func procuraConta(c *gin.Context) {
 	var endpoint string
 	if banco == "BBMN" {
 		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BBMN)
-	} else if banco == "BG" {
-		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BG)
+	} else if banco == "BB" {
+		endpoint = fmt.Sprintf("http://%s%s/procurarConta", HOST, BB)
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Banco desconhecido"})
 		return
@@ -290,33 +323,12 @@ func procuraConta(c *gin.Context) {
 		return
 	}
 
-	// Convertendo a estrutura ContaResponse para JSON
-	cookieJSON, err := json.Marshal(response)
-	if err != nil {
-		println("Erro ao codificar dados do cookie:", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao codificar dados do cookie"})
-		return
-	}
-
-	// Criando um cookie com os dados codificados em JSON
-	cookie := &http.Cookie{
-		Name:     "Alvo",
-		Value:    string(cookieJSON),
-		Path:     "/",
-		HttpOnly: false,
-		Expires:  time.Now().Add(1 * time.Hour), // Exemplo de expiração em 1 hora
-	}
-
-	// Definindo o cookie na resposta HTTP
-	http.SetCookie(c.Writer, cookie)
-
-	// Retornando os dados da conta como resposta JSON
 	c.JSON(http.StatusOK, response)
 }
 
 func retornarContas(c *gin.Context) {
 	// Obter o valor do cookie
-	cookie, err := c.Cookie("brasilheirinho")
+	cookie, err := c.Cookie("gringuesco")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Não foi possível obter o cookie"})
 		return
@@ -361,7 +373,7 @@ func retornarContas(c *gin.Context) {
 	}
 
 	// Conectar ao banco BG e adicionar suas contas
-	bgContas, err := getUnicaChaveContasFromBG(cpfCnpj)
+	bgContas, err := getUnicaChaveContasFromBB(cpfCnpj)
 	if err == nil {
 		contas = append(contas, bgContas...)
 	}
@@ -375,39 +387,6 @@ func retornarContas(c *gin.Context) {
 	// Retornar as contas em formato JSON
 	c.JSON(http.StatusOK, contas)
 }
-
-func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]interface{}, error) {
-	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var contas []interface{}
-	err = json.NewDecoder(resp.Body).Decode(&contas)
-	if err != nil {
-		return nil, err
-	}
-
-	return contas, nil
-}
-
-func getUnicaChaveContasFromBG(cpfCnpj string) ([]interface{}, error) {
-	resp, err := http.Get("http://localhost:65502/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var contas []interface{}
-	err = json.NewDecoder(resp.Body).Decode(&contas)
-	if err != nil {
-		return nil, err
-	}
-
-	return contas, nil
-}
-
 func reducaoLocalHandler(c *gin.Context) {
 	var transacao Transacao
 	if err := c.BindJSON(&transacao); err != nil {

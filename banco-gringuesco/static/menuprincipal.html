@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Banco Gringuesco - Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .bank-container {
+            background-color: #ffffff;
+            border: 2px solid #4caf50;
+            border-radius: 10px;
+            padding: 20px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .bank-container h1 {
+            color: #ffeb3b;
+        }
+
+        .bank-container p {
+            margin: 10px 0;
+        }
+
+        .bank-container .actions {
+            margin-top: 20px;
+        }
+
+        .bank-container .actions div {
+            margin-bottom: 10px;
+        }
+
+        .bank-container input {
+            padding: 5px;
+            margin: 5px 0;
+        }
+
+        .bank-container button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .deposit-button {
+            background-color: #4caf50;
+        }
+
+        .withdraw-button {
+            background-color: #f44336;
+        }
+
+        .transfer-button {
+            background-color: #ff5722;
+        }
+
+        .logout-button {
+            background-color: #0d47a1;
+            margin-top: 10px;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            border: 2px solid #4caf50;
+            border-radius: 10px;
+            padding: 20px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .popup h2 {
+            color: #ffeb3b;
+        }
+
+        .popup p {
+            margin: 10px 0;
+        }
+
+        .popup button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .confirm-button {
+            background-color: #4caf50;
+        }
+
+        .cancel-button {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bank-container">
+        <h1>Banco Gringuesco</h1>
+        <p>Nome: <span id="accountName"></span></p>
+        <p>CPF/CNPJ: <span id="accountCPF"></span></p>
+        <p>Número da Conta: <span id="accountNumber"></span></p>
+        <p>Balanço: <span id="accountBalance"></span></p>
+        <div class="actions">
+            <div>
+                <input type="number" id="depositAmount" placeholder="Valor para depositar">
+                <button class="deposit-button" onclick="deposit()">Depositar</button>
+            </div>
+            <div>
+                <input type="number" id="withdrawAmount" placeholder="Valor para retirar">
+                <button class="withdraw-button" onclick="withdraw()">Retirar</button>
+            </div>
+            <div>
+                <input type="number" id="transferAccountNumber" placeholder="Número da Conta">
+                <input type="text" id="transferBankName" placeholder="Banco">
+                <button class="transfer-button" onclick="searchAccount()">Procurar Conta</button>
+            </div>
+        </div>
+        <button class="logout-button" onclick="logout()">Sair</button>
+    </div>
+
+    <div id="popup" class="popup">
+        <h2>Conta Encontrada</h2>
+        <p>Número da Conta: <span id="popupAccountNumber"></span></p>
+        <p>Nome: <span id="popupAccountName"></span></p>
+        <p>Banco: <span id="popupBankName"></span></p>
+        <button class="confirm-button" onclick="confirmTransfer()">Confirmar</button>
+        <button class="cancel-button" onclick="closePopup()">Cancelar</button>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasilheirinho='));
+
+            if (cookieData) {
+                const sessionData = cookieData.split('=')[1].split('|');
+                const nome = sessionData[0].replace('Nome: ', '').trim().replace("+", " ");
+                const cpfRazao = sessionData[1].replace('CPF/CNPJ: ', '').trim();
+                const numConta = parseInt(sessionData[2].replace('Número da Conta: ', '').trim(), 10);
+                const balanco = parseFloat(sessionData[3].replace('Balanço: ', '').trim());
+                const tipoConta = parseInt(sessionData[4].replace('TipoConta: ', '').trim());
+
+                document.getElementById('accountName').textContent = nome;
+                document.getElementById('accountCPF').textContent = cpfRazao;
+                document.getElementById('accountNumber').textContent = numConta;
+                document.getElementById('accountBalance').textContent = balanco.toFixed(2);
+
+                window.tipoConta = tipoConta;
+            }
+        });
+
+        function deposit() {
+            const accountId = document.getElementById('accountNumber').textContent;
+            const amount = document.getElementById('depositAmount').value;
+            const tipoConta = window.tipoConta;
+
+            if (amount) {
+                const payload = {
+                    idConta: parseInt(accountId),
+                    valor: parseFloat(amount),
+                    tipoconta: tipoConta
+                };
+                fetch('/somaLocal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('accountBalance').textContent = data.newBalance.toFixed(2);
+                            alert('Depósito realizado com sucesso!');
+                        } else {
+                            alert('Erro ao realizar depósito: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                    });
+            } else {
+                alert('Por favor, insira um valor para depositar.');
+            }
+        }
+
+        function withdraw() {
+            const accountId = document.getElementById('accountNumber').textContent;
+            const amount = document.getElementById('withdrawAmount').value;
+            const tipoConta = window.tipoConta;
+
+            if (amount) {
+                const payload = {
+                    idConta: parseInt(accountId),
+                    valor: parseFloat(amount),
+                    tipoconta: tipoConta
+                };
+                fetch('/reducaoLocal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('accountBalance').textContent = data.newBalance.toFixed(2);
+                            alert('Saque realizado com sucesso!');
+                        } else {
+                            alert('Erro ao realizar saque: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                    });
+            } else {
+                alert('Por favor, insira um valor para retirar.');
+            }
+        }
+
+        function searchAccount() {
+            const accountNumber = document.getElementById('transferAccountNumber').value;
+            const bankName = document.getElementById('transferBankName').value;
+
+            if (accountNumber && bankName) {
+                const payload = {
+                    numConta: parseInt(accountNumber),
+                    banco: bankName
+                };
+
+                fetch('/procurarConta', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.numconta && data.nome && data.banco) {
+                            document.getElementById('popupAccountNumber').textContent = data.numconta;
+                            document.getElementById('popupAccountName').textContent = data.nome;
+                            document.getElementById('popupBankName').textContent = data.banco;
+                            document.getElementById('popup').style.display = 'block';
+                        } else {
+                            alert('Conta não encontrada.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                    });
+            } else {
+                alert('Por favor, insira o número da conta e o banco.');
+            }
+        }
+
+        function confirmTransfer() {
+            const accountNumber = document.getElementById('popupAccountNumber').textContent;
+            const accountName = document.getElementById('popupAccountName').textContent;
+            const bankName = document.getElementById('popupBankName').textContent;
+
+            if (accountNumber && accountName && bankName) {
+                // Redirecionar para a página de transferência
+                window.location.href = `/transferencia?numConta=${accountNumber}&nome=${accountName}&banco=${bankName}`;
+            }
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        function logout() {
+            document.cookie = "brasilheirinho=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = '/inicial';
+        }
+    </script>
+</body>
+
+</html>
