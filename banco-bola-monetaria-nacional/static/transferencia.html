@@ -143,7 +143,7 @@
                 }
             });
 
-            var cookieValue = document.cookie.split('; ').find(row => row.startsWith('alvoTransacao'));
+            var cookieValue = document.cookie.split('; ').find(row => row.startsWith('alvoBBMNtransfer'));
             if (cookieValue) {
                 var dadosAlvo = decodeURIComponent(cookieValue.split('=')[1]).split('|');
                 transfers.push({

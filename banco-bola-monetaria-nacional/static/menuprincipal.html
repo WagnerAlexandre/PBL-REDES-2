@@ -115,7 +115,7 @@
 
 <body>
     <div class="bank-container">
-        <h1>Banco brasileirinho</h1>
+        <h1>Banco Bola Monetaria Nacional</h1>
         <p>Nome: <span id="accountName"></span></p>
         <p>CPF/CNPJ: <span id="accountCPF"></span></p>
         <p>Número da Conta: <span id="accountNumber"></span></p>
@@ -149,7 +149,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasileirinho='));
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('BBMN='));
 
             if (cookieData) {
                 const sessionData = cookieData.split('=')[1].split('|');
