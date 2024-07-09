@@ -132,14 +132,7 @@ type PrepareResponse struct {
 	Status string `json:"status"`
 }
 
-type PreparedTransaction struct {
-	ID    int
-	Valor float64
-	Tipo  int
-	Url   string
-}
-
-var preparedTransactions = make(map[int]PreparedTransaction)
+var preparedTransactions = make(map[int]PrepareRequest)
 var preparedMutex sync.Mutex
 
 func main() {
@@ -299,7 +292,7 @@ func prepareHandler(c *gin.Context) {
 	}
 
 	preparedMutex.Lock()
-	preparedTransactions[request.ID] = PreparedTransaction{
+	preparedTransactions[request.ID] = PrepareRequest{
 		ID:    request.ID,
 		Valor: request.Valor,
 		Tipo:  request.Tipo,
