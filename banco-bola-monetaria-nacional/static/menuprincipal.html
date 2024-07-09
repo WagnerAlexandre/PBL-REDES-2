@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Banco Gringuesco - Interface</title>
+    <title>Banco Bola Monetaria Nacional - Interface</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -115,7 +115,7 @@
 
 <body>
     <div class="bank-container">
-        <h1>Banco Gringuesco</h1>
+        <h1>Banco brasileirinho</h1>
         <p>Nome: <span id="accountName"></span></p>
         <p>CPF/CNPJ: <span id="accountCPF"></span></p>
         <p>Número da Conta: <span id="accountNumber"></span></p>
@@ -149,7 +149,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('gringuesco='));
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasileirinho='));
 
             if (cookieData) {
                 const sessionData = cookieData.split('=')[1].split('|');
@@ -242,7 +242,6 @@
     const accountNumber = document.getElementById('transferAccountNumber').value;
     const bankName = document.getElementById('transferBankName').value;
 
-
     if (accountNumber && bankName) {
         const payload = {
             numConta: parseInt(accountNumber),
@@ -297,7 +296,7 @@
         }
 
         function logout() {
-            document.cookie = "gringuesco=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "BBMN=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             window.location.href = '/inicial';
         }
     </script>

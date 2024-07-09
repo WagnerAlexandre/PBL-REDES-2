@@ -149,7 +149,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasileirinho'));
+            const cookieData = decodeURIComponent(document.cookie).split('; ').find(row => row.startsWith('brasileirinho='));
 
             if (cookieData) {
                 const sessionData = cookieData.split('=')[1].split('|');

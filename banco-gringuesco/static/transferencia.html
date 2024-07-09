@@ -140,10 +140,11 @@
                         tipo: 2
                     });
                     total += amount;
+                    console.log(account.querySelector('h2').textContent.split('-')[1].trim())
                 }
             });
 
-            var cookieValue = document.cookie.split('; ').find(row => row.startsWith('alvoTransacao'));
+            var cookieValue = document.cookie.split('; ').find(row => row.startsWith('alvoBGtransfer'));
             if (cookieValue) {
                 var dadosAlvo = decodeURIComponent(cookieValue.split('=')[1]).split('|');
                 transfers.push({
@@ -152,8 +153,9 @@
                     banco: dadosAlvo[0],
                     tipo: 1
                 });
+                console.log(dadosAlvo[0])
             } else {
-                alert('Cookie "alvoTransacao" não encontrado.');
+                alert('Cookie "alvoBGtransfer" não encontrado.');
                 return;
             }
 

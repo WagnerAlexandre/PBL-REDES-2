@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Conta - Banco Brasileirinho</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f2f2f2;
+        }
+
+        .register-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        .register-container h1 {
+            margin-bottom: 20px;
+        }
+
+        .register-container label {
+            display: block;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+
+        .register-container input,
+        .register-container select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .register-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .register-container button:hover {
+            background-color: #0056b3;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .link-acessar-conta {
+            margin-top: 14px;
+            text-decoration: none;
+            color: #007bff;
+            font-size: 14px;
+        }
+
+        .popup {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .popup-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="register-container">
+        <h1>Cadastro de Conta - Banco Brasileirinho</h1>
+        <form id="registerForm">
+            <label for="tipoConta">Tipo de Conta:</label>
+            <select id="tipoConta" name="tipoConta" onchange="toggleForm()">
+                <option value="1">Pessoa Física</option>
+                <option value="2">Pessoa Jurídica</option>
+                <option value="3">Conta Conjunta</option>
+            </select>
+
+            <div id="pfForm" style="display:none;">
+                <label for="cpf">CPF:</label>
+                <input type="text" id="cpf" name="cpf">
+
+                <label for="nome">Nome:</label>
+                <input type="text" id="nome" name="nome">
+
+                <label for="senha">Senha:</label>
+                <input type="password" id="senha" name="senha">
+            </div>
+
+            <div id="pjForm" style="display:none;">
+                <label for="cnpj">CNPJ:</label>
+                <input type="text" id="cnpj" name="cnpj">
+
+                <label for="nomePJ">Nome Empresarial:</label>
+                <input type="text" id="nomePJ" name="nomePJ">
+
+                <label for="senhaPJ">Senha:</label>
+                <input type="password" id="senhaPJ" name="senhaPJ">
+            </div>
+
+            <div id="cjForm" style="display:none;">
+                <label for="cpf1">CPF Titular 1:</label>
+                <input type="text" id="cpf1" name="cpf1">
+
+                <label for="cpf2">CPF Titular 2:</label>
+                <input type="text" id="cpf2" name="cpf2">
+
+                <label for="nomeCJ">Nome Conjunto:</label>
+                <input type="text" id="nomeCJ" name="nomeCJ">
+
+                <label for="senhaCJ">Senha:</label>
+                <input type="password" id="senhaCJ" name="senhaCJ">
+            </div>
+
+            <button type="submit">Cadastrar</button>
+            <a class="link-acessar-conta" href="/inicial">Já possui uma conta? Acesse aqui.</a>
+        </form>
+        <div id="result"></div>
+
+        <!-- Popup de Informações da Conta -->
+        <div id="popupConta" class="popup">
+            <div class="popup-content">
+                <span class="close" onclick="fecharPopupConta()">&times;</span>
+                <h2>Informações da Conta</h2>
+                <p>Número da Conta: <span id="numeroConta"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+    
+        function toggleForm() {
+            var tipoConta = document.getElementById('tipoConta').value;
+            var pfForm = document.getElementById('pfForm');
+            var pjForm = document.getElementById('pjForm');
+            var cjForm = document.getElementById('cjForm');
+    
+            pfForm.style.display = 'none';
+            pjForm.style.display = 'none';
+            cjForm.style.display = 'none';
+    
+            disableRequiredFields(pfForm);
+            disableRequiredFields(pjForm);
+            disableRequiredFields(cjForm);
+    
+            if (tipoConta === '1') {
+                pfForm.style.display = 'block';
+                enableRequiredFields(pfForm);
+            } else if (tipoConta === '2') {
+                pjForm.style.display = 'block';
+                enableRequiredFields(pjForm);
+            } else if (tipoConta === '3') {
+                cjForm.style.display = 'block';
+                enableRequiredFields(cjForm);
+            }
+        }
+    
+        function disableRequiredFields(form) {
+            var inputs = form.querySelectorAll('input');
+            inputs.forEach(input => input.required = false);
+        }
+    
+        function enableRequiredFields(form) {
+            var inputs = form.querySelectorAll('input');
+            inputs.forEach(input => input.required = true);
+        }
+    
+        function fecharPopupConta() {
+            document.getElementById('popupConta').style.display = 'none';
+        }
+    
+        document.getElementById('registerForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+    
+            var tipoConta = document.getElementById('tipoConta').value;
+            var formData = {
+                tipo: parseInt(tipoConta, 10),
+                senha: '',
+                balanco: 0
+            };
+    
+            var endpoint = '';
+    
+            if (tipoConta === '1') {
+                formData.cpfcnpj = document.getElementById('cpf').value;
+                formData.nome = document.getElementById('nome').value;
+                formData.senha = document.getElementById('senha').value;
+                endpoint = '/criarContaPF';
+            } else if (tipoConta === '2') {
+                formData.cpfcnpj = document.getElementById('cnpj').value;
+                formData.nome = document.getElementById('nomePJ').value;
+                formData.senha = document.getElementById('senhaPJ').value;
+                endpoint = '/criarContaPJ';
+            } else if (tipoConta === '3') {
+                formData.cpf1 = document.getElementById('cpf1').value;
+                formData.cpf2 = document.getElementById('cpf2').value;
+                formData.nome = document.getElementById('nomeCJ').value;
+                formData.senha = document.getElementById('senhaCJ').value;
+                endpoint = '/criarContaCJ';
+            }
+    
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            }).then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(json => {
+                        throw new Error(json.error || 'Erro desconhecido');
+                    });
+                }
+            }).then(data => {
+                console.log('Success:', data);
+                document.getElementById('result').textContent = 'Conta criada com sucesso!';
+    
+                // Mostrar o popup com as informações da conta
+                var numeroConta = getCookieValue('NumConta'); // Obtém o valor do cookie
+                document.getElementById('numeroConta').textContent = numeroConta; // Exibe o número da conta no popup
+                document.getElementById('popupConta').style.display = 'block';
+    
+                // Esperar até que o popup seja fechado
+                var popupConta = document.getElementById('popupConta');
+                var observer = new MutationObserver(function (mutations) {
+                    mutations.forEach(function (mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'style' && !popupConta.style.display.includes('block')) {
+                            // Quando o popup for fechado, redirecionar para a página inicial
+                            window.location.href = '/inicial';
+                            observer.disconnect();
+                        }
+                    });
+                });
+    
+                observer.observe(popupConta, { attributes: true });
+                
+                // Salvar o número da conta em um cookie
+                document.cookie = `NumConta=${data.numeroConta}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
+    
+            }).catch(error => {
+                console.error('Error:', error);
+                let errorMessage = 'Erro ao criar conta.';
+                if (error.message) {
+                    errorMessage += ' Motivo: ' + error.message;
+                }
+                document.getElementById('result').textContent = errorMessage;
+            });
+    
+        });
+    
+        // Função para ler o valor do cookie
+        function getCookieValue(cookieName) {
+            var name = cookieName;
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var cookieArray = decodedCookie.split(';');
+            for (var i = 0; i < cookieArray.length; i++) {
+                var cookie = cookieArray[i].trim();
+                if (cookie.indexOf(name) === 0) {
+                    return cookie.substring(name.length, cookie.length);
+                }
+            }
+            return "";
+        }
+    
+        // Exibir o número da conta do cookie no popup ao carregar a página
+        document.addEventListener('DOMContentLoaded', function () {
+            var numConta = getCookieValue('NumConta');
+            if (numConta) {
+                document.getElementById('numeroConta').textContent = numConta;
+                document.getElementById('popupConta').style.display = 'block';
+            }
+        });
+    </script>
+
+</body>
+
+</html>

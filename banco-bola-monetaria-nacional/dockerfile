@@ -17,7 +17,7 @@ COPY . .
 RUN go build -o main main.go
 
 # Exponha a porta em que a aplicação irá rodar
-EXPOSE 65502
+EXPOSE 65500
 
 # Comando para rodar a aplicação
 CMD ["./main"]
