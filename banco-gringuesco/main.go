@@ -389,7 +389,7 @@ func abortHandler(c *gin.Context) {
 
 // Funções auxiliares para realizar as transações com 2PC
 func prepararTransacao(url string, request PrepareRequest) (bool, error) {
-	resp, err := http.Post(fmt.Sprintf("http://localhost%s/prepare", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	resp, err := http.Post(fmt.Sprintf("http://"+HOST+"%s/prepare", url), "application/json", bytes.NewBuffer(request.toJSON()))
 
 	if err != nil {
 		return false, err
@@ -403,7 +403,7 @@ func prepararTransacao(url string, request PrepareRequest) (bool, error) {
 }
 
 func commitTransacao(url string, request PrepareRequest) error {
-	resp, err := http.Post(fmt.Sprintf("http://localhost%s/commit", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	resp, err := http.Post(fmt.Sprintf("http://"+HOST+"%s/commit", url), "application/json", bytes.NewBuffer(request.toJSON()))
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func commitTransacao(url string, request PrepareRequest) error {
 }
 
 func abortTransacao(url string, request PrepareRequest) error {
-	resp, err := http.Post(fmt.Sprintf("http://localhost%s/abort", url), "application/json", bytes.NewBuffer(request.toJSON()))
+	resp, err := http.Post(fmt.Sprintf("http://"+HOST+"%s/abort", url), "application/json", bytes.NewBuffer(request.toJSON()))
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func iniciarTransferencia(c *gin.Context) {
 // retorna contas pertencentes ao cpf/cnpj do banco BBMN
 
 func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]Conta, error) {
-	resp, err := http.Get("http://localhost:65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	resp, err := http.Get("http://" + HOST + ":65500/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +495,7 @@ func getUnicaChaveContasFromBBMN(cpfCnpj string) ([]Conta, error) {
 
 // retorna contas pertencentes ao cpf/cnpj do banco BB
 func getUnicaChaveContasFromBB(cpfCnpj string) ([]Conta, error) {
-	resp, err := http.Get("http://localhost:65501/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
+	resp, err := http.Get("http://" + HOST + ":65501/getUnicaChaveContas?cpf_cnpj=" + cpfCnpj)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +540,7 @@ func procuraConta(c *gin.Context) {
 		if contaPF, ok := TContasPF[numConta]; ok {
 			cookieValue := fmt.Sprintf("%s|%d", ENDPNT, contaPF.NumConta)
 
-			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", "localhost", false, false)
+			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", HOST, false, false)
 
 			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPF.NumConta, Nome: contaPF.Nome, Banco: ENDPNT})
 			return
@@ -548,7 +548,7 @@ func procuraConta(c *gin.Context) {
 		if contaPJ, ok := TContasPJ[numConta]; ok {
 			cookieValue := fmt.Sprintf("%s|%d", ENDPNT, contaPJ.NumConta)
 
-			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", "localhost", false, false)
+			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", HOST, false, false)
 			c.JSON(http.StatusOK, ContaResponse{NumConta: contaPJ.NumConta, Nome: contaPJ.Nome, Banco: ENDPNT})
 
 			return
@@ -557,7 +557,7 @@ func procuraConta(c *gin.Context) {
 		if contaCJ, ok := TContasCJ[numConta]; ok {
 			cookieValue := fmt.Sprintf("%s|%d", ENDPNT, contaCJ.NumConta)
 
-			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", "localhost", false, false)
+			c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", HOST, false, false)
 			c.JSON(http.StatusOK, ContaResponse{NumConta: contaCJ.NumConta, Nome: contaCJ.Nome, Banco: ENDPNT})
 
 			return
@@ -625,7 +625,7 @@ func procuraConta(c *gin.Context) {
 
 	cookieValue := fmt.Sprintf("%s|%d", apontaBanco, response.NumConta)
 
-	c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", "localhost", false, false)
+	c.SetCookie("alvoBGtransfer", cookieValue, 3600, "/", HOST, false, false)
 
 	c.JSON(http.StatusOK, response)
 }
@@ -972,7 +972,7 @@ func loginHandler(c *gin.Context) {
 		// Construir o valor do cookie
 		cookieValue := fmt.Sprintf("%s|%s|%d|%.2f|%d", nome, cpfRazao, req.NumConta, balanco, tipo)
 		// Definir o cookie no contexto da requisição
-		c.SetCookie("gringuesco", cookieValue, 3600, "/", "localhost", false, false)
+		c.SetCookie("gringuesco", cookieValue, 3600, "/", HOST, false, false)
 
 		c.JSON(http.StatusOK, gin.H{"message": "Login bem-sucedido"})
 	} else {
