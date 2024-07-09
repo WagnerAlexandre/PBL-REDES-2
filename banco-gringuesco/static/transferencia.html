@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,15 +31,18 @@
             border-radius: 5px;
         }
 
-        #confirm-transfer {
+        #confirm-transfer, #cancel-transfer {
             margin-top: 20px;
             padding: 10px 20px;
-            background-color: #007bff;
             border: none;
             border-radius: 5px;
-            color: white;
             font-size: 16px;
             cursor: pointer;
+        }
+
+        #confirm-transfer {
+            background-color: #007bff;
+            color: white;
         }
 
         #confirm-transfer:hover {
@@ -46,14 +50,8 @@
         }
 
         #cancel-transfer {
-            margin-top: 10px;
-            padding: 10px 20px;
             background-color: #dc3545;
-            border: none;
-            border-radius: 5px;
             color: white;
-            font-size: 16px;
-            cursor: pointer;
         }
 
         #cancel-transfer:hover {
@@ -61,6 +59,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <h1>Transferência de Contas - Banco Gringuesco</h1>
@@ -95,7 +94,7 @@
                     accountDiv.classList.add('account-container');
                     accountDiv.innerHTML = `
                         <h2>Conta ${account.nome} - ${account.Banco}</h2> <!-- Exibindo o nome do banco -->
-                        <h2>Numero ${account.id} </h2>
+                        <h3>Numero da conta: ${account.id} </h3>
                         <p>Saldo: R$ ${account.balanco.toFixed(2)}</p>
                         <label for="transfer-${account.numConta}">Transferir:</label>
                         <input type="number" id="transfer-${account.numConta}" class="transfer-field" min="0">
@@ -127,19 +126,36 @@
         document.getElementById('confirm-transfer').addEventListener('click', function () {
             var transfers = [];
             var accounts = document.querySelectorAll('.account-container');
+            var total = 0;
+
             accounts.forEach(account => {
-                var numConta = account.querySelector('h2').textContent.split(' ')[1];
+                var numConta = parseInt(account.querySelector('h3').textContent.split(':')[1].trim());
                 var transferField = account.querySelector('.transfer-field');
                 var amount = parseFloat(transferField.value);
                 if (!isNaN(amount) && amount > 0) {
                     transfers.push({
                         numConta: numConta,
                         valor: amount,
-                        banco: account.Banco,
+                        banco: account.querySelector('h2').textContent.split('-')[1].trim(),
                         tipo: 2
                     });
+                    total += amount;
                 }
             });
+
+            var cookieValue = document.cookie.split('; ').find(row => row.startsWith('alvoTransacao'));
+            if (cookieValue) {
+                var dadosAlvo = decodeURIComponent(cookieValue.split('=')[1]).split('|');
+                transfers.push({
+                    numConta: parseInt(dadosAlvo[1]),
+                    valor: total,
+                    banco: dadosAlvo[0],
+                    tipo: 1
+                });
+            } else {
+                alert('Cookie "alvoTransacao" não encontrado.');
+                return;
+            }
 
             fetch('/realizarTransferencia', {
                 method: 'POST',
@@ -150,7 +166,7 @@
             }).then(response => {
                 if (response.ok) {
                     alert('Transferência realizada com sucesso!');
-                    window.location.href = '/menuprincipal'; 
+                    window.location.href = '/menuprincipal';
                 } else {
                     throw new Error('Erro ao realizar transferência');
                 }
@@ -166,4 +182,5 @@
     </script>
 
 </body>
+
 </html>
