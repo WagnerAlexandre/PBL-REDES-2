@@ -2,17 +2,20 @@
 ## Sumário
  1. [Introdução](#introdução)
  2. [Como Utilizar o Sistema](#como-utilizar-o-sistema)
- 3. [Estruturas Utilzadas Pelo Sistema](#estruturas-utilizadas-no-sistema)
+ 3. [Estruturas Utilizadas Pelo Sistema](#estruturas-utilizadas-no-sistema)
 
 _____
 ## Introdução
 Este sistema bancário descentralizado foi minha solução proposta para o segundo problema da disciplina PLB de Concorrência e Conectividade - TEC502 da Universidade Estadual de Feira de Santana (UEFS) do semestre 24.1.
 
-O problema pedia o desenvolvimento de um sistema descentralizado no qual um cliente pode utilizar o saldo de qualquer conta que o pertença (que seu cpf ou cpnj esteja registrado como titular daquela conta) sendo esta do banco que ele está atualmente logado ou de qualquer outro banco participante do consorcio bancário para realizar transferências entre as contas dos bancos, e, estas transferências devem seguir um modelo de transação atômica para assegurar que não haja movimentação indevida dos saldos ou algum tipo de instabilidade que faça que o sistema realize uma transação indevida ou deixe uma operação incompleta.
+O problema pedia o desenvolvimento de um sistema descentralizado no qual um cliente pode utilizar o saldo de qualquer conta que o pertença (que seu CPF ou CNPJ esteja registrado como titular daquela conta) sendo esta do banco que ele está atualmente logado ou de qualquer outro banco participante do consorcio bancário para realizar transferências entre as contas dos bancos, e, estas transferências devem seguir um modelo de transação atômica para assegurar que não haja movimentação indevida dos saldos ou algum tipo de instabilidade que faça que o sistema realize uma transação indevida ou deixe uma operação incompleta.
 
 Foi optado por desenvolver um consorcio de somente 3 bancos:
 O Banco Bola Monetária Nacional (ou BBMN), o Banco Brasileirinho (ou BB) e o Banco Gringuesco (ou BG).
-
+O modelo de transação atômica utilizado foi o 2-Phase-Commit (ou 2PC, para abreviar), o 2PC é baseado em dividir a transação em duas fases:
+1. Fase de preparação: A fase de preparação envia um "pedido" que avisa os participantes para se prepararem para receber uma requisição, caso todos os participates avisem que estão prontos para receber a requisição, o algoritmo segue para a fase de commit. Caso algum participante retorne algum erro, o algoritmo entra em uma fase intermediaria, chamada de "abort".
+2. Fase de Commit: Quando todos os participantes estão prontos para receber a requisição, o "atuador" (servidor/cliente) de origem envia a requisição (ou commit), e os participantes guardam ou atualizam os respectivos valores condizentes com o commit recebido. 
+3. Fase de Abort: Quando algum participante retorna um erro, o algoritmo precisa cancelar todas as operações, esta fase envia um pedido de abort para todos os participantes. Esta fase garante atomicidade ao buscar garantir que sempre todos os participantes devem retornar um status de "Preparado".
 ----------------------------
 ## Como utilizar o sistema: 
 ### Requisitos:
@@ -25,23 +28,20 @@ Para construir a imagem docker, vá até a pasta que guarda um sistema bancário
 
 Os bancos utilizam as portas para se diferenciarem, caso execute em computadores diferentes, será necessário alterar algumas FLAGS e linhas do código para que os códigos consigam acessar as rotas devidamente.
 
-Para o BNMN:
+Para o BBMN:
 
-`docker run -p 65500:65500 --rm -it -e wagnerAlexandre/banco-bbmn
-docker build -t banco-bbmn .`
-
-Para o BG:
-`docker run -p 65501:65501 --rm -it -e wagnerAlexandre/banco-bg
-docker build -t banco-bg .`
+`docker run --name nome-do-container --rm -p 65500:65500 nome-da-imagem`
 
 Para o BB:
-`docker run -p 65502:65502 --rm -it -e wagnerAlexandre/banco-bb
-docker build -t banco-bb .`
+`docker run --name nome-do-container --rm -p 65502:65502 nome-da-imagem `
+
+Para o BG:
+`docker run --name nome-do-container --rm -p 65501:65501 nome-da-imagem `
 
 ### Acesso ao banco
 No navegador, digite o ip:porta do banco desejado seguido de '/inicial' para ter acesso a tela de login.
 Exemplo:
-`https://0.0.0.0:65501/inicial`
+`https://localhost:65502/inicial`
 
 Abaixo um fluxograma das paginas.
 <img src="src/readme/loginFlux.png" alt="fluxoDoSistema" >
@@ -55,7 +55,7 @@ Diagrama Geral de classes utilizadas no sistema.
 <img src="src/readme/classes.png" alt="diagramaClasses" >
 
 #### Classes de uso via Web
-Estas classes são utilizadas para receber JSONS pelas rotas acessadas pelas paginas web.
+Estas classes são utilizadas para receber JSON'S pelas rotas acessadas pelas paginas web.
 
 ##### Login
 <p align="center">
@@ -78,12 +78,22 @@ Resposta da requisição "/getContas" que procura todas as contas associadas a u
 <figurecaption #align="center"> Classe de resposta ao solicitar dados da conta</figurecaption>
 </p>
 
-##### Transacao
-Utilizada internamente para realizar uma modificação local do saldo de uma conta
+- ID - Representa o numero da conta.
+- Nome - Nome Titular ou Empresarial da conta.
+- Balanco - Saldo disponível na conta.
+- Banco - Banco o qual esta conta pertence.
+
+##### Transação
+Utilizada internamente para realizar uma modificação local do saldo de uma conta.
 <p align="center">
 <img src="src/readme/web/classTransacao.png" alt="transacaoLocal" >
 <figurecaption #align="center"> Classe de transação local</figurecaption>
 </p>
+
+- ID - Numero da conta a receber a transação.
+- TipoConta - Tipo da conta a receber a transação (PF:1, PJ:2, CJ:3)
+- Valor - Quantia a ser reduzida/incrementada.
+
 
 ##### Transação Web
 Utilizada para receber um pedido de transação via rota.
@@ -92,8 +102,13 @@ Utilizada para receber um pedido de transação via rota.
 <figurecaption #align="center"> Classe de transação web</figurecaption>
 </p>
 
+- ID - Numero da conta alvo da transação.
+- Valor - Valor a ser incrementado/decrementado do saldo.
+- Banco - Banco o qual a conta pertence
+- Tipo - Tipo da transação (1: Somar, 2: Decrementar)
+
 #### Estruturas de uso interno
-Estas estruturas são utilizadas somente internamente pelo servidor.
+Estas estruturas são utilizadas somente internamente pelo servidor para representar os tipos de conta que é possível possuir no sistema.
 
 ##### Conta Pessoa Física
 Como as contas de Pessoa Física são registradas no sistema.
@@ -102,12 +117,29 @@ Como as contas de Pessoa Física são registradas no sistema.
 <figurecaption #align="center"> Classe de conta Pessoa Física</figurecaption>
 </p>
 
-##### Conta Pessoa Juridica
+- NumConta - Representa o número identificador da conta
+- CPF   - Representa o CPF titular da conta.
+- Nome - Nome do titular da conta.
+- Senha - Senha da conta.
+- Tipo - Tipo da conta, utilizado para passar para a struct Conta, ao enviar as informações da conta.
+- Balanco - Saldo disponível na conta.
+- mutex - Objeto de sincronização para tratar concorrência, ao utilizar mutex.lock(), a conta fica bloqueada, permitindo somente que a função que bloqueou a conta modifique o saldo.
+
+
+##### Conta Pessoa Jurídica
 Como as contas de Pessoa Jurídica são registradas no sistema.
 <p align="center">
 <img src="src/readme/Banco de dados/classContaPJ.png" alt="classPJ" >
 <figurecaption #align="center"> Classe de conta Pessoa Jurídica</figurecaption>
 </p>
+
+- NumConta - Representa o número identificador da conta
+- CNPJ   - Representa o CNPJ titular da conta.
+- Nome - Nome do Empresa titular da conta.
+- Senha - Senha da conta.
+- Tipo - Tipo da conta, utilizado para passar para a struct Conta, ao enviar as informações da conta.
+- Balanco - Saldo disponível na conta.
+- mutex - Objeto de sincronização para tratar concorrência, ao utilizar mutex.lock(), a conta fica bloqueada, permitindo somente que a função que bloqueou a conta modifique o saldo.
 
 ##### Conta Conjunta
 Como as contas conjuntas são registradas no sistema.
@@ -116,8 +148,17 @@ Como as contas conjuntas são registradas no sistema.
 <figurecaption #align="center"> Classe de conta conjunta</figurecaption>
 </p>
 
+- NumConta - Representa o número identificador da conta
+- CPF1   - Representa o CPF  de um titular da conta.
+- CPF2   - Representa o CPF  do outro titular da conta.
+- Nome - Nome titular da conta.
+- Senha - Senha da conta.
+- Tipo - Tipo da conta, utilizado para passar para a struct Conta, ao enviar as informações da conta.
+- Balanco - Saldo disponível na conta.
+- mutex - Objeto de sincronização para tratar concorrência, ao utilizar mutex.lock(), a conta fica bloqueada, permitindo somente que a função que bloqueou a conta modifique o saldo.
+
 ### Estruturas utilizadas pelo 2-Phase-Commit (2PC) implementado
-Estas estruturas são implementadas e utilizadas somente pelas rotas responsaveis por gerencias o 2PC
+Estas estruturas são implementadas e utilizadas somente pelas rotas responsáveis por gerencias o 2PC
 
 ##### Prepare Request
 Refere a primeira fase do 2PC, a fase de preparação, esta estrutura é enviada via a rota "/prepare" para os bancos participantes de uma transação para preparação das contas participantes.
@@ -125,6 +166,7 @@ Refere a primeira fase do 2PC, a fase de preparação, esta estrutura é enviada
 <img src="src/readme/2PC/classPrepareRequest.png" alt="classPrepararReq" >
 <figurecaption #align="center"> Classe de preparar requisição</figurecaption>
 </p>
+
 
 
 ##### Prepare Response
@@ -155,7 +197,7 @@ Sim, o sistema permite selecionar e realizar transferências entre diferentes co
 Sim, é possível transacionar entre diferentes bancos. O sistema permite enviar transações do banco A, B e C para o banco D, utilizando comunicação adequada entre os servidores dos bancos envolvidos.
 
 ### 4. Comunicação entre servidores
-Os bancos estão se comunicando utilizando o protocolo HTTP, com endpoints específicos para preparar, commitar e abortar transações, implementando o algoritmo de Commit em Duas Fases (2PC).
+Os bancos estão se comunicando utilizando o protocolo HTTP, com endpoints específicos para preparar, realizar commit's e abortar transações, implementando o algoritmo de Commit em Duas Fases (2PC).
 
 ### 5. Sincronização em um único servidor
 A concorrência em um único servidor é tratada utilizando mutexes (locks) para garantir que apenas uma transação pode alterar o saldo de uma conta por vez. Isso evita condições de corrida e garante a consistência dos dados.
