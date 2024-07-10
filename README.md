@@ -1,9 +1,18 @@
 # PBL-REDES-2
 ## Sumário
- 1. [Introdução](#introdução)
- 2. [Como Utilizar o Sistema](#como-utilizar-o-sistema)
- 3. [Estruturas Utilizadas Pelo Sistema](#estruturas-utilizadas-no-sistema)
++ [Introdução](#introdução)
++ [Como Utilizar o Sistema](#como-utilizar-o-sistema)
++ &nbsp;&nbsp;&nbsp;[Requisitos](#requisitos)
++ &nbsp;&nbsp;&nbsp;[Executando](#executando)
++ &nbsp;&nbsp;&nbsp;[Acesso ao Banco](#acesso-ao-banco)
++ [Estruturas Utilizadas Pelo Sistema](#estruturas-utilizadas-no-sistema)
++ &nbsp;&nbsp;&nbsp;[Estruturas utilizadas](#estruturas-utilizadas)
++ &nbsp;&nbsp;&nbsp;[Classes de Uso Via Web](#classes-de-uso-via-web)
++ &nbsp;&nbsp;&nbsp;[Estruturas de Uso Interno](#estruturas-de-uso-interno)
 
++ &nbsp;&nbsp;&nbsp;[Estruturas utilizadas pelo 2-Phase-Commit (2PC) implementado](#estruturas-utilizadas-pelo-2-phase-commit-2pc-implementado)
++ &nbsp;&nbsp;&nbsp;[Implementação do modelo de transação atômica](#implementação-do-modelo-de-transação-atômica)
++ [Conclusão](#conclusão)
 _____
 ## Introdução
 Este sistema bancário descentralizado foi minha solução proposta para o segundo problema da disciplina PLB de Concorrência e Conectividade - TEC502 da Universidade Estadual de Feira de Santana (UEFS) do semestre 24.1.
@@ -187,32 +196,4 @@ O modelo implementado é o 2-Phase-Commit
 
 -------------------------
 ## Conclusão
-### 1. Permite gerenciar contas?
-Sim, o sistema realiza o gerenciamento de contas, permitindo a criação de contas dos tipos Pessoa Física (PF), Pessoa Jurídica (PJ) e Conta Conjunta (CJ). As informações de cada conta, como número da conta, CPF/CNPJ, nome, senha e balanço, são armazenadas e gerenciadas no sistema.
-
-### 2. Permite selecionar e realizar transferência entre diferentes contas?
-Sim, o sistema permite selecionar e realizar transferências entre diferentes contas. As transferências podem ser realizadas tanto entre contas do mesmo banco quanto entre contas de diferentes bancos.
-
-### 3. É possível transacionar entre diferentes bancos?
-Sim, é possível transacionar entre diferentes bancos. O sistema permite enviar transações do banco A, B e C para o banco D, utilizando comunicação adequada entre os servidores dos bancos envolvidos.
-
-### 4. Comunicação entre servidores
-Os bancos estão se comunicando utilizando o protocolo HTTP, com endpoints específicos para preparar, realizar commit's e abortar transações, implementando o algoritmo de Commit em Duas Fases (2PC).
-
-### 5. Sincronização em um único servidor
-A concorrência em um único servidor é tratada utilizando mutexes (locks) para garantir que apenas uma transação pode alterar o saldo de uma conta por vez. Isso evita condições de corrida e garante a consistência dos dados.
-
-### 6. Algoritmo da concorrência distribuída está teoricamente bem empregado? Qual algoritmo foi utilizado? Está correto para a solução?
-Sim, o algoritmo de Commit em Duas Fases (2PC) foi utilizado para garantir a consistência e atomicidade das transações distribuídas. Este algoritmo é adequado para a solução, pois permite que todos os bancos participantes concordem em commitar ou abortar uma transação de forma coordenada.
-
-### 7. Algoritmo está tratando o problema na prática? A implementação do algoritmo está funcionando corretamente?
-Sim, a implementação do algoritmo 2PC está funcionando corretamente. O sistema realiza a preparação das transações em todos os bancos participantes e somente realiza o commit se todos os participantes confirmarem a preparação com sucesso. Caso contrário, a transação é abortada em todos os participantes.
-
-### 8. Tratamento da confiabilidade
-O sistema é projetado para continuar funcionando corretamente quando um dos bancos perde a conexão. Se um banco participante não puder ser alcançado, a transação é abortada. Quando o banco retorna à conexão, novas transações podem ser iniciadas.
-
-### 9. Pelo menos uma transação concorrente é realizada?
-Sim, o sistema suporta a realização de transações concorrentes. Utilizando mutexes, garantimos que múltiplas transações podem ser processadas de forma concorrente, mantendo a consistência dos saldos das contas.
-
-### 10. Como foi tratado o caso em que mais de duas transações ocorrem no mesmo banco de forma concorrente? O saldo fica correto? Os clientes conseguem realizar as transações?
-Quando mais de duas transações ocorrem no mesmo banco de forma concorrente, mutexes são utilizados para garantir que apenas uma transação pode alterar o saldo de uma conta por vez. Isso assegura que o saldo das contas permanece correto e que todas as transações são processadas com sucesso, mantendo a consistência dos dados.
+O sistema desenvolvido permite o gerenciamento de contas, incluindo criação e manutenção de contas dos tipos PF, PJ, e CJ. Ele suporta transferências entre contas do mesmo banco e entre diferentes bancos, utilizando comunicação HTTP e implementando o algoritmo de Commit em Duas Fases (2PC) para garantir a consistência das transações distribuídas. A concorrência é tratada com mutexes para evitar condições de corrida, assegurando a consistência dos saldos das contas. A implementação prática do 2PC está funcionando corretamente, permitindo transações confiáveis, mesmo com interrupções de conexão em um dos bancos. O sistema suporta transações concorrentes, garantindo que múltiplas transações sejam processadas corretamente, mantendo os saldos corretos e permitindo que os clientes realizem suas operações com sucesso.
