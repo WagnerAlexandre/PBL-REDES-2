@@ -176,7 +176,10 @@ Refere a primeira fase do 2PC, a fase de preparação, esta estrutura é enviada
 <figurecaption #align="center"> Classe de preparar requisição</figurecaption>
 </p>
 
-
+- ID - Número da conta a receber essa requisição.
+- Valor - Valor a ser adicionado/subtraído do saldo.
+- Tipo - Tipo de operação (Adicionar/Subtrair).
+- Url - Banco alvo da transação.
 
 ##### Prepare Response
 Esta estrutura é a resposta a requisição da fase de preparação do 2PC
@@ -185,13 +188,18 @@ Esta estrutura é a resposta a requisição da fase de preparação do 2PC
 <figurecaption #align="center"> Classe de resposta da fase de preparação</figurecaption>
 </p>
 
-### Implementação do modelo de transação atômica
-O modelo implementado é o 2-Phase-Commit
+- Status - Estado da resposta a requisição de preparação, ao receber uma requisição de preparação, o servidor deve retornar uma resposta, caso seja qualquer uma diferente de OK, é considerado falha e o algoritmo deve iniciar a fase de "abort".
 
+### Implementação do modelo de transação atômica
+O modelo implementado é o 2-Phase-Commit, mas uma singularidade da implementação, é que por conta do requisito de ser possível realizar uma transação de um numero "N" de contas para uma outra conta, o algoritmo deve receber um "pacote" de transações ao invés de somente uma ou duas transações.
+ Dentro do código, é utilizado laços de repetições para iterar sobre cada transações individualmente e montar pacotes de pedidos de "prepare" e "commit", e possivelmente de "abort".
+ O cliente, ao iniciar uma transferência, dispara um pacote de JSON's para a rota `"/realizarTransferencia"`, dentro desta rota, o JSON é decodificado em uma lista de `TransacaoWeb`, que por sua vez é devidamente iterado para enviar pedidos de "prepare" para cada participante, se todos respondem com status "ok", a fase de commit é iniciada.
+ Abaixo há um diagrama de sequência da implementação.
 <p align="center">
 <img src="src/readme/2PC/sequencia2pc.png" alt="classRespReq" >
 <figurecaption #align="center"> Diagrama de sequência do 2PC implementado</figurecaption>
 </p>
+
 
 
 -------------------------
